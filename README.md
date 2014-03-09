@@ -5,11 +5,11 @@ PUT Visual Odometry for RGBD data presented, e.g., at ECMR 2013
 
 -> Dependencies
 
-Eigen
-OpenCv
-PCL
-OpenNI
-g2o (can be used, but tracking can provide results without it)
+- Eigen
+- OpenCv
+- PCL
+- OpenNI
+- g2o (can be used, but tracking can provide results without it)
 
 -> How to compile
 
