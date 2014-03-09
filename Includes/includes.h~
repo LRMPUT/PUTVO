@@ -1,0 +1,262 @@
+#ifndef _INC
+#define _INC
+
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+// Ogolne + STL
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <utility>
+#include <time.h>
+#include <vector>
+#include <list>
+#include <algorithm>
+
+// Podst PCL
+#include <boost/thread/thread.hpp>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/registration/transformation_estimation_svd.h>
+
+// Wizualizacja + RangeImage
+#include "pcl/range_image/range_image.h"
+#include "pcl/io/pcd_io.h"
+#include "pcl/visualization/range_image_visualizer.h"
+#include "pcl/visualization/pcl_visualizer.h"
+#include <pcl/visualization/cloud_viewer.h>
+
+// NARF
+#include "pcl/features/range_image_border_extractor.h"
+#include "pcl/keypoints/narf_keypoint.h"
+#include "pcl/features/narf_descriptor.h"
+#include <pcl/console/parse.h>
+
+// ICP
+#include <pcl/registration/icp.h>
+#include <pcl/registration/ia_ransac.h>
+
+// Kinect
+#include <pcl/io/openni_grabber.h>
+#include <pcl/io/openni_camera/openni_driver.h>
+
+// Filtry
+#include <pcl/filters/passthrough.h>
+#include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/voxel_grid.h>
+
+// Wielowymiarowe drzewa binarne
+#include <pcl/kdtree/kdtree_flann.h>
+
+
+// OpenCV
+#include "opencv/cv.h"
+#include "opencv/highgui.h"
+#include "opencv2/nonfree/features2d.hpp"
+#include "opencv2/core/eigen.hpp"
+#include "opencv2/core/core.hpp"
+#include <opencv2/opencv.hpp>
+#include <Eigen/Eigen>
+#include "opencv2/features2d/features2d.hpp"
+
+#include "opencv2/video/tracking.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/highgui/highgui.hpp"
+
+
+struct Constrain
+{
+	double minObrX, maxObrX, minObrY, maxObrY, minObrZ, maxObrZ, minTx, maxTx, minTy, maxTy, minTz, maxTz;
+};
+
+
+// Projekt
+#include "../Show/Show.h"
+#include "../Filtry/Filtry.h"
+#include "../Matching/Matching.h"
+#include "../DBscan/dbscan.h"
+#include "../Track/track.h"
+
+#define PI 3.141592
+#define INF 999999999
+#define INV_FOCAL 0.00190476
+
+
+
+
+// Struktura przechowujaca indeksy pary deskryptorow
+struct ParaDeskryptorow
+{
+	int indeks1,indeks2;
+	double value;
+};
+
+// Struktura Deskryptora
+struct DeskryptorDouble
+{
+	pcl::PointXYZ punkt;
+	int RGB;
+	vector<double> deskryptor;
+};
+
+
+
+// struktura podpinana jako bufor danych z Kinecta
+
+struct StrukturaKinectaXYZRGBA
+{
+    void callback(const pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr& cloud)
+    {
+        pc = cloud; 
+		// Streaming zakonczony - wystaw flage 1     
+		Streaming=0;
+    }
+    pcl::PointCloud<pcl::PointXYZRGBA>::ConstPtr pc;
+   
+    //zmienna zezwalająca na odczytanie danych z buffora zbierającego dane z Kinect
+    bool Streaming;
+};
+
+struct StrukturaKinectaRGBD
+{
+    void callback(const boost::shared_ptr<openni_wrapper::Image>& imgColor, const boost::shared_ptr<openni_wrapper::DepthImage>& imgODL, float f)
+    {
+        imgRGB = imgColor;
+        imgD = imgODL;
+        focal = f;
+        
+		// Streaming zakonczony - wystaw flage 1     
+		Streaming=0;
+    }
+    boost::shared_ptr<openni_wrapper::Image> imgRGB;
+    boost::shared_ptr<openni_wrapper::DepthImage> imgD;
+    float focal;
+   
+    //zmienna zezwalająca na odczytanie danych z buffora zbierającego dane z Kinect
+    bool Streaming;
+};
+
+
+
+struct StrukturaParametrow
+{
+	// Filtr antyNANowy
+	bool antyNaN;
+
+	// Filtr VoxelGrid (downsampling)
+	bool VoxelGrid;
+	
+	// LeafSize for VoxelGrid
+	double LeafSize;
+
+	// Filtr Antyszumowy 3D
+	bool antySzum;
+
+	// Angular resolution (NARF)
+	double ang_res;
+	
+	// Support size (NARF)
+	double support_size;
+	
+	// Hessian Threshold (SURF)
+	int HessianThresholdRGB,HessianThresholdD;
+	
+	// Expected number of keypoints RGB i D
+	int SURF2DExpectedRGB, SURF2DExpectedD;
+	
+	// Minimal number of points to form a cluster
+	int DBScanMinPts;
+		
+	// DBScan eps		
+	double DBScanEps;
+	
+	// SURF size when only detector
+	int SURFsize;
+	
+	// RANSAC on/off
+	bool RANSAC;
+	
+	// RANSAC iteration number
+	int iteration_number;
+	
+	// Number of used pairs of NARF descriptors to compute RANSAC model
+	int NARF_pair_number;
+
+	// Threshold - when acknowledged as inlier
+	double Threshold;
+
+	// Minimal number of matched points in NARF matching
+	int NARF_minimal_matched;
+	
+	// Maksymalna liczba iteracji RANSACa bez poprawy
+	int MaxLiczbaIteracjiBezPoprawy;
+	
+	// Zadany maksymalny error z RANSACA
+	double RANSACerror;
+	
+	// Zadane prawdopodobienstwo sukcesu RANSACa
+	double RANSACsuccessrate;
+	
+	// Ograniczenia na 6 DOF
+	Constrain constrain;
+	
+	
+	// Max iteration dla ICP
+	int ICP_max_iterations;
+	
+	// Transformation epsilon
+	double ICPepsilon;
+	
+	// Outlier Rejection Threshold
+	double OutRejThre;
+	
+	// Maximum Correspondence Distance
+	double maxCorrespondeceDist;
+	
+	// MODE: 0- chmury z kinecta 1- wczytywanie z pliku
+	bool MODE;	
+};
+
+
+// Model sprawdzany w RANSACu
+class Model
+{
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+	float Error, ProcentPunktow;
+	Eigen::MatrixXf Transformation;
+	vector<int> indeksy_par;
+};
+
+// Ustawia widok wizualizacji
+void setViewerPose (pcl::visualization::PCLVisualizer& viewer);
+
+// Zwraca wartości kątów dla danej macierzy transformacji
+void Oblicz_Katy(Eigen::Matrix4f &transformation, float *Orient);
+
+// Transformuje chmurę o zadaną macierz
+pcl::PointCloud<pcl::PointXYZ>::Ptr Transform(pcl::PointCloud<pcl::PointXYZ>::Ptr chmura, Eigen::Matrix4f &transformation);
+void TransformSelf(pcl::PointCloud<pcl::PointXYZ>::Ptr chmura, Eigen::Matrix4f &transformation);
+void TransformSelf(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr chmura, Eigen::Matrix4f &transformation);
+
+// Wylicza kwadrat normy euklidesowej pomiędzy dwoma punktami
+double SquaredNorm(pcl::PointXYZ a ,pcl::PointXYZ b);
+
+// Sprawdza, czy punkty są różne
+bool DiffPoints(pcl::PointXYZ a, pcl::PointXYZ b);
+
+// Porównanie punktów kluczowych dla metody sort
+bool keypointscompare (pair< cv::KeyPoint, int >   i,pair< cv::KeyPoint, int >  j);
+bool keyRESPONSEcompare (cv::KeyPoint i, cv::KeyPoint j) ;
+
+// Konwersja int 2 String
+string convertInt(int number);
+
+// Wyliczenie transformacji z podanych wartości parametrów
+void calculateTransformation(Eigen::Matrix4f &transformation,float alpha, float beta, float gamma, float tx, float ty, float tz);
+#endif
+
