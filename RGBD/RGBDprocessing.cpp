@@ -10,6 +10,8 @@ Eigen::Vector3f RGBDclass::point2Dto3D(cv::Point2f p, float z,
 		cv::Mat cameraMatrix, cv::Mat distCoeffs) {
 	cv::Mat src(1,1,CV_32FC2), dst(1,1,CV_32FC2);
 
+	//printf("Point 2d to 3d - z : %f\n", z);
+
 	src.at < cv::Vec2f > (0, 0)[0] = p.x;
 	src.at < cv::Vec2f > (0, 0)[1] = p.y;
 

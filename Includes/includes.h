@@ -13,6 +13,33 @@ struct Constraints
 
 struct ProgramParameters
 {
+	// Verbose
+	int verbose;
+
+	// Tracking (0), Matching (1)
+	int trackingMatching;
+
+	// Matching Loop Closure
+	int matchingLoopClosure;
+
+	// Matching Loop Closure window from i-x (define x)
+	int matchingLoopClosureWindowFrom;
+
+	// Matching Loop Closure window to i-y (define y, y<x)
+	int matchingLoopClosureWindowTo;
+
+	// Matching type (0 - FAST/BRIEF | 1 - SURF/SURF)
+	int matchingType;
+
+	// Temporally saved history size
+	int historySize;
+
+	// Bundle Adjustment
+	int bundleAdjustment;
+
+	// Bundle Adjustment window size
+	int bundleAdjustmentWindowSize;
+
 	//
 	// Tracking parameters
 	//
@@ -105,18 +132,18 @@ struct ProgramParameters
 	// Showing tracking
 	int showTracking;
 
-	// historySize
-	int historySize;
-
 	// g2o features
 	int g2oWithFeatures;
+
+	// g2o vs sba save file
+	int g2o_vs_sba;
 
 };
 
 struct CalibrationParameters
 {
-	double fu, fv, u0, v0;
-	double k1, k2, p1, p2, k3, k4, k5, k6;
+	float fu, fv, u0, v0;
+	float k1, k2, p1, p2, k3, k4, k5, k6;
 	cv::Mat cameraMatrix;
 	cv::Mat distCoeffs;
 };

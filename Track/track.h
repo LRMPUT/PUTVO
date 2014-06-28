@@ -21,12 +21,21 @@
 
 #include "../RGBD/RGBDprocessing.h"
 
+
+#include <Eigen/StdVector>
+
 struct kabschVertex {
-	int vertexId;
+	cv::Mat imageRGB, imageD;
+	long int vertexId;
 	std::vector< cv::Point2f > keypoints;
 	std::vector<int> keypointsId;
 	std::vector< Eigen::Vector3f > keypoints3d;
 	std::vector< bool > inGraph;
+
+	std::vector< Eigen::Vector3f > matchingKeypoints3d;
+	cv::Mat descriptors;
+	std::vector< Eigen::Matrix3f, Eigen::aligned_allocator<Eigen::Matrix3f> > informationMatrix;
+	Eigen::Matrix4f absolutePosition;
 };
 
 class Track
@@ -41,14 +50,27 @@ public:
 	//
 	bool performedTrack;
 
+	// Time measurements;
+	double detectionTime, descriptionTime, trackingTime, matchingTime;
+	int measurementCounter;
 
+	double matrixError(Eigen::Matrix4f x, Eigen::Matrix4f y);
 
 private:
 	// My rounding
 	int roundX(double X);
 	int roundY(double Y);
 
+	int computeRANSACIterationCount(double successRate, double inlierRate, int numberOfPairs = 3);
 
+	bool robustTransformationEstimation(
+			const std::vector<std::pair<int, int> >& matches, int pair_number,
+			const std::vector< Eigen::Vector3f > firstKeypoints3d, double inliner_threshold,
+			const std::vector< Eigen::Vector3f > secondKeypoints3d, const Constraints& constraints,
+			double ransac_break_percent, Eigen::Matrix4f &OptimalTransformation, bool saveInliers, bool turnOffConstrains, std::vector<bool> &isBestInlier);
+
+	// Focus measure
+	double FMmodifiedLaplacian(const cv::Mat& src);
 
 public:
 	Track();
@@ -68,18 +90,15 @@ public:
 	int vertexCounter;
 
 	std::vector<bool> wasInlierSecond, wasInlierFirst;
-
-	// FM
-	double FMmodifiedLaplacian(const cv::Mat& src);
-
-	// Clare before next tracking
-	void clearTrack();
 	
 	// Detection at start
-	void newDetection(ProgramParameters programParameters, CalibrationParameters calibrationParams, double depthInvScale, int frameId);
+	void newDetection(ProgramParameters programParameters, CalibrationParameters calibrationParams, double depthInvScale, long int frameId);
+	void newDetectionMatching(ProgramParameters programParameters, CalibrationParameters calibrationParams, double depthInvScale, long int frameId);
 
 
-	void createVertex(ProgramParameters programParameters, CalibrationParameters calibrationParams, double depthInvScale, int frameId);
+	void createVertex(ProgramParameters programParameters,
+			CalibrationParameters calibrationParams, double depthInvScale,
+			long int frameId, cv::Mat imageRGB);
 
 	// Detection using new detector
 	cv::Point3f normalize_vector(cv::Point3f point);
@@ -93,11 +112,13 @@ public:
 	// Show tracked image
 	void trackShow();
 
-	// RANSAC and Kabsch
-	Eigen::Matrix4f estimateTransformation(kabschVertex firstFrame, kabschVertex secondFrame, int pair_number,
+	// RANSAC
+	bool estimateTransformation(kabschVertex *firstFrame, kabschVertex *secondFrame, ProgramParameters programParameters,
 			Constraints constraints, CalibrationParameters cameraParameters,
-			double inliner_threshold, double ransac_break_percent,
-			double depthInvScale, Eigen::Matrix4f &res, std::ofstream &g2o);
+			double depthInvScale, Eigen::Matrix4f &res, bool matching = false, int numberOfFeatures = 500, bool saveInliers = false, bool turnOffConstrains = false);
+
+	// Information matrix
+	Eigen::Matrix3f getInformationMatrix(double u, double v, double z);
 
 };
 

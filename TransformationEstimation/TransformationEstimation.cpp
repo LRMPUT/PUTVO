@@ -51,3 +51,9 @@ void Kabsch(Eigen::MatrixXf &P, Eigen::MatrixXf &Q, Eigen::Matrix4f &Opt)
 	Opt.block<3,1>(0,3) = T.head<3>();
 }
 
+void Umeyama(Eigen::MatrixXf &P, Eigen::MatrixXf &Q, Eigen::Matrix4f &Opt) {
+	Opt = Eigen::umeyama(P.transpose(), Q.transpose(), false);
+	if (std::isnan(Opt(0, 0))) {
+		Opt = Eigen::Matrix4f::Identity();
+	}
+}

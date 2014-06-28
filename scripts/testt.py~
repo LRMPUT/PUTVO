@@ -1,0 +1,9 @@
+from subprocess import call
+import subprocess
+import sys
+dataset=sys.argv[1];
+
+x= subprocess.check_output("ls ../../Datasets/"+dataset+"/ | grep image" , shell = True);
+y = x.rstrip().rsplit('\n');
+print(len(y))
+

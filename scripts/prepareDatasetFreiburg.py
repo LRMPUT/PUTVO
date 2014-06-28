@@ -26,7 +26,7 @@ numberOfImages, err = p.communicate();
 call("cp ../../Datasets/"+dataset+"/groundtruth*.txt ./groundtruth.txt", shell=True);
 
 # Copying camera parameters
-if "frieburg1" in dataset:
+if "freiburg1" in dataset:
 	call("cp ../cameraFr1.cfg ../camera.cfg", shell=True); 
 else:
 	call("cp ../cameraFr2.cfg ../camera.cfg", shell=True); 

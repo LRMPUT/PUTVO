@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
 project(iterative)
 
+set(CMAKE_BUILD_TYPE Release) 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11") # -Wall 
+
 find_package(PCL)
 find_package(OpenCV REQUIRED)
 

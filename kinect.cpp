@@ -1,6 +1,10 @@
 #include "kinect.h"
 #include <pcl/common/time.h>
 
+bool geometricDistanceCompare(geometricDistance i, geometricDistance j) {
+	return i.distance < j.distance;
+}
+
 Kinect::Kinect() {
 	this->ReadParameters();
 	this->ReadCalibrationParameters();
@@ -20,10 +24,45 @@ void Kinect::ReadParameters() {
 	while (!o.eof()) {
 		getline(o, linia);
 
+		if (linia == "# Verbose") {
+			o >> linia;
+			programParameters.verbose = atoi(linia.c_str());
+		}
+		else if (linia == "# Tracking (0), Matching (1)") {
+			o >> linia;
+			programParameters.trackingMatching = atoi(linia.c_str());
+		}
+		else if (linia == "# Matching Loop Closure") {
+			o >> linia;
+			programParameters.matchingLoopClosure = atoi(linia.c_str());
+		}
+		else if (linia
+				== "# Matching Loop Closure window from i-x (define x)") {
+			o >> linia;
+			programParameters.matchingLoopClosureWindowFrom = atoi(linia.c_str());
+		} else if (linia
+				== "# Matching Loop Closure window to i-y (define y, y<x)") {
+			o >> linia;
+			programParameters.matchingLoopClosureWindowTo = atoi(linia.c_str());
+		} else if (linia == "# Matching type (0 - FAST/BRIEF | 1 - SURF/SURF | 2 - ORB)")
+		{
+			o >> linia;
+			programParameters.matchingType = atoi(linia.c_str());
+		} else if (linia == "# Temporally saved history size") {
+			o >> linia;
+			programParameters.historySize = atoi(linia.c_str());
+		} else if (linia == "# Bundle Adjustment") {
+			o >> linia;
+			programParameters.bundleAdjustment = atoi(linia.c_str());
+		} else if (linia == "# Bundle Adjustment window size") {
+			o >> linia;
+			programParameters.bundleAdjustmentWindowSize = atoi(linia.c_str());
+		}
+
 		//
 		// Tracking parameters
 		//
-		if (linia == "# Number of tracked frames") {
+		else if (linia == "# Number of tracked frames") {
 			o >> linia;
 			programParameters.TrackingLength = atoi(linia.c_str());
 		} else if (linia == "# Tracking feature number") {
@@ -48,22 +87,19 @@ void Kinect::ReadParameters() {
 		else if (linia == "# Detection in stripes") {
 			o >> linia;
 			programParameters.detectionInStripes = atoi(linia.c_str());
-		}
-		else if (linia == "# New detector on/off") {
+		} else if (linia == "# New detector on/off") {
 			o >> linia;
 			programParameters.newDetector = atoi(linia.c_str());
-		}
-		else if (linia == "# New detector kickThreshold") {
+		} else if (linia == "# New detector kickThreshold") {
 			o >> linia;
 			programParameters.newDetectorKickThreshold = atoi(linia.c_str());
-		}
-		else if (linia == "# New detector fast threshold") {
+		} else if (linia == "# New detector fast threshold") {
 			o >> linia;
 			programParameters.newDetectorFastThreshold = atoi(linia.c_str());
-		}
-		else if  (linia == "# New detector depth test threshold") {
+		} else if (linia == "# New detector depth test threshold") {
 			o >> linia;
-			programParameters.newDetectorDepthTestThreshold = atof(linia.c_str());
+			programParameters.newDetectorDepthTestThreshold = atof(
+					linia.c_str());
 		}
 		//
 		// DB Scan
@@ -71,8 +107,7 @@ void Kinect::ReadParameters() {
 		else if (linia == "# DBScan on/off") {
 			o >> linia;
 			programParameters.DBScan = atoi(linia.c_str());
-		}
-		else if (linia == "# DBScan MinPts") {
+		} else if (linia == "# DBScan MinPts") {
 			o >> linia;
 			programParameters.DBScanMinPts = atoi(linia.c_str());
 		} else if (linia == "# DBScan eps") {
@@ -154,15 +189,23 @@ void Kinect::ReadParameters() {
 		} else if (linia == "# Showing tracking") {
 			o >> linia;
 			programParameters.showTracking = atoi(linia.c_str());
-		} else if (linia == "# historySize - additional edges") {
-			o >> linia;
-			programParameters.historySize = atoi(linia.c_str());
 		} else if (linia == "# g2o with features") {
 			o >> linia;
 			programParameters.g2oWithFeatures = atoi(linia.c_str());
+		} else if (linia == "# g2o vs sba save file") {
+			o >> linia;
+			programParameters.g2o_vs_sba = atoi(linia.c_str());
+		}
+		else if (linia.find("###") == -1 && linia.size() > 1)
+		{
+			std::cout<<linia<<std::endl;
+			std::cout<< linia.size() <<std::endl;
+			std::cout<<"Error reading parameters!" << std::endl;
+			exit(0);
 		}
 
 	}
+
 	o.close();
 }
 
@@ -220,19 +263,19 @@ void Kinect::ReadCalibrationParameters() {
 	o.close();
 
 	// Calibration matrices
-/*	float data[5] = { calibrationParams.k1, calibrationParams.k2,
-			calibrationParams.p1, calibrationParams.p2, calibrationParams.k3 };
-	calibrationParams.distCoeffs = cv::Mat(1, 5, CV_32FC1, &data);
-	float cm[3][3] = { { calibrationParams.fu, 0, calibrationParams.u0 }, { 0,
-			calibrationParams.fv, calibrationParams.v0 }, { 0, 0, 1 } };
-	calibrationParams.cameraMatrix = cv::Mat(3, 3, CV_32FC1, &cm);
-*/
+	/*	float data[5] = { calibrationParams.k1, calibrationParams.k2,
+	 calibrationParams.p1, calibrationParams.p2, calibrationParams.k3 };
+	 calibrationParams.distCoeffs = cv::Mat(1, 5, CV_32FC1, &data);
+	 float cm[3][3] = { { calibrationParams.fu, 0, calibrationParams.u0 }, { 0,
+	 calibrationParams.fv, calibrationParams.v0 }, { 0, 0, 1 } };
+	 calibrationParams.cameraMatrix = cv::Mat(3, 3, CV_32FC1, &cm);
+	 */
 	/*std::cout << calibrationParams.fu << " " << calibrationParams.fv << " "
-			<< calibrationParams.u0 << " " << calibrationParams.v0 << " "
-			<< calibrationParams.k1 << " " << calibrationParams.k2 << " "
-			<< calibrationParams.p1 << " " << calibrationParams.p2 << " "
-			<< calibrationParams.k3 << std::endl;
-	std::cout<<calibrationParams.cameraMatrix<<std::endl;*/
+	 << calibrationParams.u0 << " " << calibrationParams.v0 << " "
+	 << calibrationParams.k1 << " " << calibrationParams.k2 << " "
+	 << calibrationParams.p1 << " " << calibrationParams.p2 << " "
+	 << calibrationParams.k3 << std::endl;
+	 std::cout<<calibrationParams.cameraMatrix<<std::endl;*/
 }
 
 void Kinect::ReadInitialTransformation() {
@@ -242,25 +285,106 @@ void Kinect::ReadInitialTransformation() {
 	double x, y, z, qx, qy, qz, qw;
 	o >> x >> y >> z >> qx >> qy >> qz >> qw;
 
-	Eigen::Quaternion<float> quat( qw, qx, qy, qz );
-	KinectInitial.block<3,3>(0,0) = quat.toRotationMatrix();
-	KinectInitial(0,3) = x;
-	KinectInitial(1,3) =  y;
-	KinectInitial(2,3) =  z;
-	KinectInitial(3,3) = 1.0;
+	Eigen::Quaternion<float> quat(qw, qx, qy, qz);
+	KinectInitial.block<3, 3>(0, 0) = quat.toRotationMatrix();
+	KinectInitial(0, 3) = x;
+	KinectInitial(1, 3) = y;
+	KinectInitial(2, 3) = z;
+	KinectInitial(3, 3) = 1.0;
+}
+
+void Kinect::saveTrajectory(Eigen::Matrix4f transformation,
+		std::ofstream & estTrajectory, const std::string& timestamp) {
+	// Saving estimate in Freiburg format
+	Eigen::Quaternion<float> Q(transformation.block<3, 3>(0, 0));
+	estTrajectory << timestamp << " " << transformation(0, 3) << " "
+			<< transformation(1, 3) << " " << transformation(2, 3) << " "
+			<< Q.coeffs().x() << " " << Q.coeffs().y() << " " << Q.coeffs().z()
+			<< " " << Q.coeffs().w() << endl;
+}
+
+void Kinect::saveG20Vertex(Eigen::Matrix4f transformation, std::ofstream& g2o,
+		const kabschVertex& tmpVertex) {
+
+	saveTrajectory(transformation, g2o,
+			"VERTEX_SE3:QUAT " + std::to_string(tmpVertex.vertexId));
+}
+
+void Kinect::saveG20Vertex(Eigen::Matrix4f transformation, std::ofstream& g2o,
+		const int id) {
+
+	saveTrajectory(transformation, g2o,
+			"VERTEX_SE3:QUAT " + std::to_string(id));
+}
+
+void Kinect::saveG20Edge(std::ofstream& g2o, const kabschVertex& tmpVertex,
+		int i) {
+	g2o << "EDGE_SE3:QUAT " << tmpVertex.vertexId << " "
+			<< tmpVertex.keypointsId[i] << " " << tmpVertex.keypoints3d[i][0]
+			<< " " << tmpVertex.keypoints3d[i][1] << " "
+			<< tmpVertex.keypoints3d[i][2] << " 0 0 0 1 "
+			<< tmpVertex.informationMatrix[i](0, 0) << " "
+			<< tmpVertex.informationMatrix[i](0, 1) << " "
+			<< tmpVertex.informationMatrix[i](0, 2) << " 0 0 0 "
+			<< tmpVertex.informationMatrix[i](1, 1) << " "
+			<< tmpVertex.informationMatrix[i](1, 2) << " 0 0 0 "
+			<< tmpVertex.informationMatrix[i](2, 2)
+			<< " 0 0 0 0.00000001 0 0 0.00000001 0 0.00000001" << std::endl;
+}
+
+void Kinect::saveG20Edge(std::ofstream& g2o, const int vertex1Id,
+		const int vertex2Id, Eigen::Matrix4f transformation) {
+	Eigen::Quaternion<float> Q(transformation.block<3, 3>(0, 0));
+
+	if (std::isfinite(transformation(0, 3))
+			&& std::isfinite(transformation(1, 3))
+			&& std::isfinite(transformation(2, 3))
+			&& std::isfinite(transformation(3, 3))
+			&& std::isfinite(Q.coeffs().x()) && std::isfinite(Q.coeffs().y())
+			&& std::isfinite(Q.coeffs().z()) && std::isfinite(Q.coeffs().w())
+			&& transformation(0, 3) < 100 && transformation(1, 3) < 100
+			&& transformation(2, 3) < 100) {
+		g2o << "EDGE_SE3:QUAT " << vertex1Id << " " << vertex2Id << " "
+				<< transformation(0, 3) << " " << transformation(1, 3) << " "
+				<< transformation(2, 3) << " " << Q.coeffs().x() << " "
+				<< Q.coeffs().y() << " " << Q.coeffs().z() << " "
+				<< Q.coeffs().w()
+				<< " 1 0 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 1 0 1" << endl;
+	}
+}
+
+void Kinect::saveG20Fix(std::ofstream& g2o, const int id) {
+	g2o << "FIX " << id << endl;
+}
+
+void Kinect::findAndSaveG20Features(kabschVertex& frame, std::ofstream& g2o,
+		const int firstOrSecond) {
+
+	if (firstOrSecond == 1) {
+		for (int i = 0; i < tracking->wasInlierFirst.size(); i++) {
+			if (tracking->wasInlierFirst[i] == true
+					&& frame.inGraph[i] == false) {
+				frame.inGraph[i] = true;
+
+				saveG20Edge(g2o, frame, i);
+			}
+		}
+		tracking->wasInlierFirst.clear();
+	} else if (firstOrSecond == 2) {
+		for (int i = 0; i < tracking->wasInlierSecond.size(); i++) {
+			if (tracking->wasInlierSecond[i] == true
+					&& frame.inGraph[i] == false) {
+				frame.inGraph[i] = true;
+				saveG20Edge(g2o, frame, i);
+			}
+		}
+		// WTF! TODO: To nie bug, ale nie pamietam o co chodzi ;d
+		tracking->wasInlierFirst.clear();
+		//tracking->wasInlierSecond.clear();
+	}
 }
 
 void Kinect::TrackingRun() {
-	tracking = new Track();
-
-
-
-	// Saving trajectory in Freiburg format
-	std::ifstream gtNumberStream;
-	gtNumberStream.open("matchedIndices");
-	std::string timestamp;
-	ofstream estTrajectory;
-	estTrajectory.open("../results/result");
 
 	// Locally used variables
 	char RGBname[30], Dname[30];
@@ -269,345 +393,431 @@ void Kinect::TrackingRun() {
 	char relativeTransformationName[30];
 	int j = 0, saved_number = 1;
 	transformation[0] = KinectInitial;
-	//transformation[0] = Eigen::Matrix4f::Identity();
 	cv::Mat rgbImg[3], dImg[3];
+	std::ifstream gtNumberStream;
+	std::string timestamp;
+	std::ofstream estTrajectory, g2o, g2oIndices;
 
-	/*for (int i = 1 ; i < programParameters.TrackingLength; i++) {
-			cv::Mat xxx;
-			sprintf(RGBname, "rgb_%04d.png", i);
-			RGBD->LoadRGB(RGBname, xxx);
-			double start = pcl::getTime();
-			double val = tracking->FMmodifiedLaplacian(xxx);
-			start = pcl::getTime() - start;
-			cout<<val << " " << start <<endl;
-	}
-	int a;
-	cin>>a;*/
+	gtNumberStream.open("matchedIndices");
+	estTrajectory.open("../results/result");
+	g2o.open("../results/graphFile.g2o");
+	g2oIndices.open("../results/g2oIndices");
 
-	// First detection
-	cout << "Reading first RGB i D" << endl;
+	// Creating the core
+	tracking = new Track();
 
+	double startTime = pcl::getTime();
 
-	long startTime = pcl::getTime();
-
+	// Reading 1st image
 	rgbImg[0] = cv::Mat();
-	RGBD->LoadRGBD("rgb_0001.png", "depth_0001.png", rgbImg[0], dImg[0]);
+	RGBD->LoadRGBD("rgb_00001.png", "depth_00001.png", rgbImg[0], dImg[0]);
 	tracking->frameBGR[0] = rgbImg[0];
 	tracking->frameD[0] = dImg[0];
 
-	if (programParameters.visualization == 1)
-	{
+	// Visualization
+	if (programParameters.visualization == 1) {
 		// Saving point clouds
 		sprintf(relativeTransformationName, "1.pcd");
-		partial_cloud[0] = RGBD->BuildPointCloudFromRGBD(
-						tracking->frameBGR[0], tracking->frameD[0], depthInvScale, calibrationParams);
+		partial_cloud[0] = RGBD->BuildPointCloudFromRGBD(tracking->frameBGR[0],
+				tracking->frameD[0], depthInvScale, calibrationParams);
 		RGBD->SaveCloudXYZRGBA(relativeTransformationName, partial_cloud[0]);
 	}
 
+	// First position in gt
+	getline(gtNumberStream, timestamp);
+	timestamp = timestamp.substr(0, timestamp.find("\t"));
+
 	// Detection on the first set of images
-	cout << "New detection" << endl;
-	tracking->newDetection(programParameters, calibrationParams, depthInvScale, 0);
-	cout<<"Ended detection" << endl;
+	float data[5] = { calibrationParams.k1, calibrationParams.k2,
+			calibrationParams.p1, calibrationParams.p2, calibrationParams.k3 };
+	calibrationParams.distCoeffs = cv::Mat(1, 5, CV_32FC1, &data);
+	float cm[3][3] = { { calibrationParams.fu, 0, calibrationParams.u0 }, { 0,
+			calibrationParams.fv, calibrationParams.v0 }, { 0, 0, 1 } };
+	calibrationParams.cameraMatrix = cv::Mat(3, 3, CV_32FC1, &cm);
 
-	// First position
-	getline(gtNumberStream,timestamp);
-	timestamp = timestamp.substr(0,timestamp.find("\t"));
+	if (programParameters.trackingMatching == 0) {
+		tracking->newDetection(programParameters, calibrationParams,
+				depthInvScale, 0);
+	} else {
+		tracking->newDetectionMatching(programParameters, calibrationParams,
+				depthInvScale, 0);
+	}
+	// Saving 1st estimate
+	saveTrajectory(transformation[0], estTrajectory, timestamp);
 
-	cout << "Saving in freiburg format" << endl;
-	Eigen::Quaternion<float> Q(transformation[0].block<3, 3>(0, 0));
-	estTrajectory << timestamp << " " << transformation[0](0, 3)
-			<< " " << transformation[0](1, 3) << " "
-			<< transformation[0](2, 3) << " " << Q.coeffs().x()
-			<< " " << Q.coeffs().y() << " " << Q.coeffs().z() << " "
-			<< Q.coeffs().w() << endl;
+	// Saving to .g2o
+	g2oIndices << timestamp << std::endl;
+	kabschVertex &tmpVertex = tracking->vertexHistory[0];
+	tmpVertex.absolutePosition = transformation[0];
 
-	// zapis g2o
-	std::ofstream g2o;
-	g2o.open("../results/tracking.g2o");
-	kabschVertex tmpFrame =
-						tracking->vertexHistory[0];
-	g2o << "VERTEX_SE3:QUAT " << tmpFrame.vertexId <<  " "
-			<< transformation[0](0, 3) << " " << transformation[0](1, 3) << " "
-			<< transformation[0](2, 3) << " " << Q.coeffs().x() << " "
-			<< Q.coeffs().y() << " " << Q.coeffs().z() << " " << Q.coeffs().w()
-			<< endl;
-	g2o << "FIX " << tmpFrame.vertexId << endl;
-//	kabschVertex tmpVertex = tracking->vertexHistory[tracking->vertexHistory.size() - 1];
-//	for (int i =0; i< tmpVertex.keypointsId.size(); i++) {
-//		g2o << "VERTEX_SE3:QUAT " << tmpVertex.keypointsId[i] << " 0 0 0 0 0 0 1"<<endl;
-//		g2o << "EDGE_SE3:QUAT 0 " << tmpVertex.keypointsId[i] << " "
-//				<< tmpVertex.keypoints3d[i][0] << " "
-//				<< tmpVertex.keypoints3d[i][1] << " "
-//				<< tmpVertex.keypoints3d[i][2] << " 0 0 0 1"
-//				<< " 0.0001 0 0 0 0 0 0.0001 0 0 0 0 0.0001 0 0 0 0.0001 0 0 0.0001 0 0.0001" << endl;
-//				//<< " 1 0 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 1 0 1" << endl;
-//	}
+	saveG20Vertex(transformation[0], g2o, tmpVertex);
+	saveG20Fix(g2o, tmpVertex.vertexId);
 
+	if (programParameters.g2oWithFeatures > 0) {
+		for (int i = 0; i < tmpVertex.keypointsId.size(); i++) {
+			saveG20Vertex(Eigen::Matrix4f::Identity(), g2o,
+					tmpVertex.keypointsId[i]);
+			saveG20Edge(g2o, tmpVertex, i);
+		}
+	}
 
-
-	cout << "Saving absolute" << endl;
 	// Saving absolute transformation
 	sprintf(relativeTransformationName, "1.abs");
-	saveTransformation(relativeTransformationName,
-			transformation[0]);
+	saveTransformation(relativeTransformationName, transformation[0]);
 
-
-	// tracking loop
-	cout<<"Tracking length: " << programParameters.TrackingLength<<endl;
-	for (int i = 2 ; i < programParameters.TrackingLength; i++) {
+	// MAIN TRACKING LOOP
+	for (int i = 2; i < programParameters.TrackingLength; i++) {
 		// Gt timstamp
-		getline(gtNumberStream,timestamp);
-		timestamp = timestamp.substr(0,timestamp.find("\t"));
+		getline(gtNumberStream, timestamp);
+		timestamp = timestamp.substr(0, timestamp.find("\t"));
 
 		// Loading the image to track features
-		cout << "Loading tracking: " << i << endl;
-		sprintf(RGBname, "rgb_%04d.png", i);
-		sprintf(Dname, "depth_%04d.png", i);
-		cout<<RGBname<<endl;
+		sprintf(RGBname, "rgb_%05d.png", i);
+		sprintf(Dname, "depth_%05d.png", i);
+
 		RGBD->LoadRGBD(RGBname, Dname, rgbImg[2], dImg[2]);
 		tracking->frameBGR[2] = rgbImg[2];
 		tracking->frameD[2] = dImg[2];
-		std::cout<<"s : " << tracking->frameBGR[2].cols<<" "<<tracking->frameBGR[2].rows<<endl;
 
 		// Doing the tracking procedure
-		tracking->doTracking(programParameters, depthInvScale);
-
-		// Preview of the tracking
-		if (programParameters.showTracking)
+		if (programParameters.trackingMatching == 0)
 		{
-			tracking->trackShow();
+			tracking->doTracking(programParameters, depthInvScale);
 		}
-		// If we need to start new detection
-		cout << "Checking stop condition" << endl;
-		if ( i % programParameters.TrackingStepSize == j ) {
+		else
+		{
+			swap(tracking->frameBGR[1], tracking->frameBGR[2]);
+		}
 
+//		// Preview of the tracking
+//		if (programParameters.showTracking) {
+//			tracking->trackShow();
+//		}
+
+		// If we need to start new detection
+		if (i % programParameters.TrackingStepSize == j
+				|| (tracking->points[1].size()
+						< programParameters.TrackingFeaturesThreshold && programParameters.trackingMatching == 0)) {
 
 			// Let's make a a history vertex out of the currently tracked features
-			tracking->createVertex(programParameters, calibrationParams, depthInvScale, atoi(timestamp.c_str()));
+			g2oIndices << timestamp << std::endl;
+			tracking->createVertex(programParameters, calibrationParams,
+								depthInvScale, saved_number, tracking->frameBGR[1]);
 
+			// Current frame is secondFrame in matching
 			Eigen::Matrix4f relativeTransformation, oldTransformation;
-			kabschVertex &secondFrame =
-					tracking->vertexHistory[tracking->vertexHistory.size() - 1];
+			kabschVertex *secondFrame =
+					&tracking->vertexHistory[tracking->vertexHistory.size() - 1];
 
 			// Matching frames
-			for (int y = 0; y < tracking->vertexHistory.size() - 1; y++) {
-				kabschVertex &firstFrame = tracking->vertexHistory[y];
-				cout << "Estimating transformation between " << firstFrame.vertexId << " & " << secondFrame.vertexId << endl;
+			int historySavedSize = tracking->vertexHistory.size();
+			int bundleAdjustmentStart, bundleAdjustmentStop =  historySavedSize - 1;
 
-				// Estimating transformation
-				KinectInitial = tracking->estimateTransformation(firstFrame,
-						secondFrame, programParameters.transformationPairNumber,
-						programParameters.constrain, calibrationParams,
-						programParameters.inlierThreshold,
-						programParameters.wantedInlierRatio, depthInvScale,
-						relativeTransformation, g2o);
+			// If there is bundle adjustment activated
+			if (programParameters.bundleAdjustment == 1)
+				bundleAdjustmentStart =  std::max(0, historySavedSize - 1 - programParameters.bundleAdjustmentWindowSize);
+			else
+				bundleAdjustmentStart = std::max(0, historySavedSize - 2);
 
-				// Adding features to graph
-				if (programParameters.g2oWithFeatures > 0) {
-					// First frame
-					std::cout<<"SIZES: " << tracking->wasInlierFirst.size() << " " << firstFrame.inGraph.size() << std::endl;
-					for (int i = 0; i < tracking->wasInlierFirst.size(); i++) {
-						if ( tracking->wasInlierFirst[i] == true && firstFrame.inGraph[i] == false ) {
-							firstFrame.inGraph[i] = true;
-							g2o << "EDGE_SE3:QUAT " << firstFrame.vertexId
-									<< " " << 5000 + firstFrame.keypointsId[i] << " " // TODO: 5000 is hardcoded !!!
-									<< firstFrame.keypoints3d[i][0] << " "
-									<< firstFrame.keypoints3d[i][1] << " "
-									<< firstFrame.keypoints3d[i][2]
-									<< " 0 0 0 1"
-									<< " 0.0001 0 0 0 0 0 0.0001 0 0 0 0 0.0001 0 0 0 0.00000001 0 0 0.00000001 0 0.00000001"
-									<< std::endl;
-						}
-					}
-					tracking->wasInlierFirst.clear();
-				}
+			// Main matching loop
+			for (int y = bundleAdjustmentStart ; y < bundleAdjustmentStop; y++) {
+				kabschVertex *firstFrame = &tracking->vertexHistory[y];
 
-
-				if ( ( relativeTransformation - Eigen::Matrix4f::Identity() ).norm() > 0.1
-						|| y + 1 == tracking->vertexHistory.size() - 1) {
-					// Adding transformation to graph
-					Eigen::Matrix4f xxx = relativeTransformation.inverse();
-					Eigen::Quaternion<float> Qg(xxx.block<3, 3>(0, 0));
-					g2o << "EDGE_SE3:QUAT " << firstFrame.vertexId << " "
-							<< secondFrame.vertexId << " " << xxx(0, 3) << " "
-							<< xxx(1, 3) << " " << xxx(2, 3) << " "
-							<< Qg.coeffs().x() << " " << Qg.coeffs().y() << " "
-							<< Qg.coeffs().z() << " " << Qg.coeffs().w()
-							<< " 1 0 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 1 0 1"
+				if (programParameters.verbose != 0)
+				{
+					cout << "Estimating transformation between "
+							<< firstFrame->vertexId << " & " << secondFrame->vertexId
 							<< endl;
 				}
+				bool saveInliers =  !programParameters.trackingMatching;//( y == bundleAdjustmentStop - 1);
+				// Estimating transformation
+				bool transformationFound = tracking->estimateTransformation(
+						firstFrame, secondFrame, programParameters,
+						programParameters.constrain, calibrationParams,
+						depthInvScale, relativeTransformation,
+						programParameters.trackingMatching,
+						programParameters.TrackingFeatureNumber,
+						saveInliers);
 
-				// Saving for feature
-				if (y + 1 == tracking->vertexHistory.size() - 1) {
-					oldTransformation = relativeTransformation;
+				// Adding inlier features to graph
+				if (programParameters.g2oWithFeatures > 0) {
+					if (transformationFound)
+						findAndSaveG20Features(*firstFrame, g2o, 1);
+					else if (y == bundleAdjustmentStop - 1)
+						saveG20Edge(g2o, firstFrame->vertexId,
+								secondFrame->vertexId,
+								Eigen::Matrix4f::Identity());
+				}
+				// G20 w/o features
+				else if (transformationFound) {
+					saveG20Edge(g2o, firstFrame->vertexId, secondFrame->vertexId,
+							relativeTransformation.inverse());
+				}
+				// No transformation found to the last frame -- adding identity to have continuous graph
+				else if (y == bundleAdjustmentStop - 1) {
+					saveG20Edge(g2o, firstFrame->vertexId, secondFrame->vertexId,
+							Eigen::Matrix4f::Identity());
+					relativeTransformation = Eigen::Matrix4f::Identity();
 				}
 
 			}
-			// Adding features to graph
+
+			// Adding current frame inlier features to graph
 			if (programParameters.g2oWithFeatures > 0) {
-				// First frame
-				std::cout<<"SIZES: " << tracking->wasInlierSecond.size() << " " << secondFrame.inGraph.size() << std::endl;
-				for (int i = 0; i < tracking->wasInlierSecond.size(); i++) {
-					if (tracking->wasInlierSecond[i] == true
-							&& secondFrame.inGraph[i] == false) {
-						secondFrame.inGraph[i] = true;
-						g2o << "EDGE_SE3:QUAT " << secondFrame.vertexId << " "
-								<< 5000 + secondFrame.keypointsId[i]
-								<< " " // TODO: 5000 is hardcoded !!!
-								<< secondFrame.keypoints3d[i][0] << " "
-								<< secondFrame.keypoints3d[i][1] << " "
-								<< secondFrame.keypoints3d[i][2] << " 0 0 0 1"
-								<< " 0.0001 0 0 0 0 0 0.0001 0 0 0 0 0.0001 0 0 0 0.00000001 0 0 0.00000001 0 0.00000001"
-								<< std::endl;
-					}
-				}
-				tracking->wasInlierFirst.clear();
+				findAndSaveG20Features(*secondFrame, g2o, 2);
 			}
 
+			// HACK for reading KW's results
+			/*		ifstream icp;
+			 sprintf(relativeTransformationName, "../icp/%d.icp", i);
+			 icp.open(relativeTransformationName);
+			 std::string linia;
+			 for (int hh1=0;hh1<4;hh1++)
+			 {
+			 for (int jj1=0;jj1<4;jj1++)
+			 {
+			 icp>>linia;
+			 relativeTransformation(hh1,jj1) = atof(linia.c_str());
+			 }
+			 getline(icp, linia);
+			 }
+			 std::cout<<"i="<<i<<std::endl<<relativeTransformation<<std::endl;
+			 icp.close();
+			 */
+//			if (std::isnan(relativeTransformation(0,0)))
+//			{
+//				relativeTransformation = Eigen::Matrix4f::Identity();
+//			}
 
-			relativeTransformation = oldTransformation;
-//			cout << "Estimating transformation " << endl;
-//			Eigen::Matrix4f relativeTransformation;
-//			KinectInitial = tracking->estimateTransformation(firstFrame, secondFrame,
-//					programParameters.transformationPairNumber,
-//					programParameters.constrain, calibrationParams,
-//					programParameters.inlierThreshold,
-//					programParameters.wantedInlierRatio,
-//					depthInvScale,
-//					relativeTransformation, g2o);
 
-			// Reading KW's results
-	/*		ifstream icp;
-			sprintf(relativeTransformationName, "../icp/%d.icp", i);
-			icp.open(relativeTransformationName);
-			std::string linia;
-			for (int hh1=0;hh1<4;hh1++)
-			{
-				for (int jj1=0;jj1<4;jj1++)
-				{
-					icp>>linia;
-					relativeTransformation(hh1,jj1) = atof(linia.c_str());
-				}
-				getline(icp, linia);
-			}
-			std::cout<<"i="<<i<<std::endl<<relativeTransformation<<std::endl;
-			icp.close();
-	*/
-			cout << "Saving relative" << endl;
 			// Saving relative transformation
 			sprintf(relativeTransformationName, "%d.rel", i);
-			saveTransformation(relativeTransformationName, relativeTransformation);
+			saveTransformation(relativeTransformationName,
+					relativeTransformation);
 
+//			printf("DET: %f\n", (relativeTransformation).determinant() );
 
-			cout<<"Saving absolute"<<endl;
 			// Saving absolute transformation
-			transformation[saved_number] = transformation[saved_number-1] * relativeTransformation.inverse();
+			transformation[saved_number] = transformation[saved_number - 1]
+					* relativeTransformation.inverse();
 			sprintf(relativeTransformationName, "%d.abs", i);
-			saveTransformation(relativeTransformationName, transformation[saved_number]);
+			saveTransformation(relativeTransformationName,
+					transformation[saved_number]);
+			tracking->vertexHistory[tracking->vertexHistory.size() - 1].absolutePosition =
+					transformation[saved_number];
 
-			cout<<"Saving in freiburg format" << endl;
-			Eigen::Quaternion<float> Q(
-					transformation[saved_number].block<3, 3>(0, 0));
-			estTrajectory << timestamp << " " << transformation[saved_number](0, 3) << " "
-					<< transformation[saved_number](1, 3) << " " << transformation[saved_number](2, 3) << " "
-					<< Q.coeffs().x() << " " << Q.coeffs().y() << " "
-					<< Q.coeffs().z() << " " << Q.coeffs().w() << endl;
+			// Saving in freiburg
+			saveTrajectory(transformation[saved_number], estTrajectory,
+					timestamp);
 
-
-			sprintf(relativeTransformationName, "%d.pcd", i);
-			partial_cloud[0] = RGBD->BuildPointCloudFromRGBD(
-					tracking->frameBGR[2], tracking->frameD[2], depthInvScale,
-					calibrationParams);
-			RGBD->SaveCloudXYZRGBA(relativeTransformationName,
-					partial_cloud[0]);
-
+			// Attemp to perform loop closure
+//			if (programParameters.matchingLoopClosure == 1) {
+//
+//				int historySavedSize = tracking->vertexHistory.size();
+//				int loopClosureStart = std::max(0, historySavedSize - 1 - programParameters.matchingLoopClosureWindowFrom);
+//				int loopClosureStop = std::max(0, historySavedSize - 1 - programParameters.matchingLoopClosureWindowTo);
+//
+//				std::cout<< loopClosureStart << " to " << loopClosureStop << std::endl;
+//
+//				double minimalDistance = -1;
+//				int minimalIndex = -1;
+//				for (int y = loopClosureStart; y < loopClosureStop ; y++) {
+//					kabschVertex *firstFrame = &tracking->vertexHistory[y];
+//
+//					double matrixErr = tracking->matrixError(
+//							firstFrame->absolutePosition,
+//							secondFrame->absolutePosition);
+//
+//					cout << "Errors for loop closure: " << matrixErr << " --- "
+//							<< firstFrame->vertexId << " "
+//							<< secondFrame->vertexId << std::endl;
+//					if (minimalDistance == -1 || minimalDistance > matrixErr) {
+//						minimalDistance = matrixErr;
+//						minimalIndex = y;
+//					}
+//				}
+//
+//				if (minimalIndex != -1) {
+//					// Estimating transformation
+//					kabschVertex *firstFrame =
+//							&tracking->vertexHistory[minimalIndex];
+//					cout << "Index: " << firstFrame->vertexId << " "
+//							<< secondFrame->vertexId << std::endl;
+//
+//					bool transformationFound = tracking->estimateTransformation(
+//							firstFrame, secondFrame, programParameters,
+//							programParameters.constrain, calibrationParams,
+//							depthInvScale, relativeTransformation,
+//							0, programParameters.TrackingFeatureNumber, true);
+//
+//					std::cout << "Loop closure success : "
+//							<< transformationFound << std::endl;
+//
+//					if (transformationFound) {
+//						saveG20Edge(g2o, firstFrame->vertexId,
+//								secondFrame->vertexId,
+//								relativeTransformation.inverse());
+//					}
+//				}
+//
+//			}
 
 			// Saving point clouds
-			if (programParameters.visualization == 1)
-			{
+			if (programParameters.visualization == 1) {
+				sprintf(relativeTransformationName, "%d.pcd", i);
+				partial_cloud[0] = RGBD->BuildPointCloudFromRGBD(
+						tracking->frameBGR[2], tracking->frameD[2],
+						depthInvScale, calibrationParams);
+				RGBD->SaveCloudXYZRGBA(relativeTransformationName,
+						partial_cloud[0]);
+
 				sprintf(relativeTransformationName, "%d.pcd", i);
 				partial_cloud[saved_number] = RGBD->BuildPointCloudFromRGBD(
-						tracking->frameBGR[2], tracking->frameD[2], depthInvScale, calibrationParams);
-				RGBD->SaveCloudXYZRGBA(relativeTransformationName, partial_cloud[saved_number]);
+						tracking->frameBGR[2], tracking->frameD[2],
+						depthInvScale, calibrationParams);
+				RGBD->SaveCloudXYZRGBA(relativeTransformationName,
+						partial_cloud[saved_number]);
 			}
 
-
-
-			//if (tracking->points[1].size()
-			//		< programParameters.TrackingFeaturesThreshold)
-			//{
-			// Starting new detection
-			cout << "Starting new detection" << endl;
+			// If we need to detect new features
+			if (programParameters.verbose != 0) {
+				cout << "Starting new detection" << endl;
+			}
 			RGBD->LoadRGBD(RGBname, Dname, rgbImg[0], dImg[0]);
 			tracking->frameBGR[0] = rgbImg[0];
 			tracking->frameD[0] = dImg[0];
 
-
-			tracking->newDetection(programParameters, calibrationParams,
-					depthInvScale, atoi(timestamp.c_str()));
-
-			//}
-
-//			g2o << "VERTEX_SE3:QUAT " << tracking->vertexCounter-5 << " "
-//					<< transformation[saved_number](0, 3) << " "
-//					<< transformation[saved_number](1, 3) << " "
-//					<< transformation[saved_number](2, 3) << " "
-//					<< Q.coeffs().x() << " " << Q.coeffs().y() << " "
-//					<< Q.coeffs().z() << " " << Q.coeffs().w() << endl;
-
-//			Eigen::Quaternion<float> Qg(
-//					relativeTransformation.block<3, 3>(0, 0));
-//
-//			g2o << "EDGE_SE3:QUAT " << tracking->vertexCounter - 10 << " "
-//					<< tracking->vertexCounter - 5 << " "
-//					<< relativeTransformation(0, 3) << " "
-//					<< relativeTransformation(1, 3) << " "
-//					<< relativeTransformation(2, 3) << " " << Qg.coeffs().x()
-//					<< " " << Qg.coeffs().y() << " " << Qg.coeffs().z() << " "
-//					<< Qg.coeffs().w()
-//					<< " 1 0 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 1 0 1" << endl;
-
-//			tmpVertex = tracking->vertexHistory[tracking->vertexHistory.size() - 1];
-//				for (int i =0; i< tmpVertex.keypointsId.size(); i++) {
-//					g2o << "VERTEX_SE3:QUAT " << tmpVertex.keypointsId[i] << " 0 0 0 0 0 0 1"<<endl;
-//					g2o << "EDGE_SE3:QUAT "<<tracking->vertexHistory.size()*5 - 5<<" " << tmpVertex.keypointsId[i] << " "
-//							<< tmpVertex.keypoints3d[i][0] << " "
-//							<< tmpVertex.keypoints3d[i][1] << " "
-//							<< tmpVertex.keypoints3d[i][2] << " 0 0 0 1"
-//							<< " 0.0001 0 0 0 0 0 0.0001 0 0 0 0 0.0001 0 0 0 0.0001 0 0 0.0001 0 0.0001" << endl;
-//							//<< " 1 0 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 1 0 1" << endl;
-//				}
-
+			if (programParameters.trackingMatching == 0) {
+				tracking->newDetection(programParameters, calibrationParams,
+						depthInvScale, saved_number);
+			} else {
+				tracking->newDetectionMatching(programParameters,
+						calibrationParams, depthInvScale, saved_number);
+			}
 			saved_number++;
 		}
 	}
 
-	cout<<"Ended algorithm calculation:"<<endl<< pcl::getTime() - startTime << endl;
 
+	double ti = pcl::getTime() - startTime;
+	if (programParameters.verbose != 0) {
+		printf("\n\n\nEnded algorithm calculation: %f\n", ti);
+	}
+
+	ofstream t;
+	t.open("timeAndLC");
+	t << ti << std::endl;
+
+
+
+	// LC
+	int ileLC = 0;
+	if (programParameters.matchingLoopClosure == 1) {
+		Eigen::Matrix4f relativeTransformation;
+		double startLC = pcl::getTime();
+		int historySavedSize = tracking->vertexHistory.size();
+
+		std::vector<geometricDistance> loopClosureDistances;
+		for (int i=0;i<historySavedSize;i++)
+		{
+			for(int j=i+2*programParameters.bundleAdjustmentWindowSize;j<historySavedSize;j++)
+			{
+				kabschVertex *firstFrame = &tracking->vertexHistory[i];
+				kabschVertex *secondFrame = &tracking->vertexHistory[j];
+
+				geometricDistance *tmp = new geometricDistance();
+				tmp->i = i;
+				tmp->j = j;
+				tmp->distance = tracking->matrixError(
+						firstFrame->absolutePosition,
+						secondFrame->absolutePosition);
+				loopClosureDistances.push_back(*tmp);
+			}
+		}
+
+		// Sort by distances
+		std::sort(loopClosureDistances.begin(), loopClosureDistances.end(), geometricDistanceCompare);
+
+		int i=0;
+		while (pcl::getTime() - startLC < ti) {
+
+			if (i < loopClosureDistances.size()) {
+				geometricDistance tmp = loopClosureDistances[i];
+				if (programParameters.verbose != 0) {
+					std::cout << "LC distance : " << tmp.distance << std::endl;
+				}
+				// Estimating transformation
+				kabschVertex *firstFrame =
+						&tracking->vertexHistory[tmp.i];
+				kabschVertex *secondFrame =
+						&tracking->vertexHistory[tmp.j];
+
+				bool transformationFound = tracking->estimateTransformation(
+						firstFrame, secondFrame, programParameters,
+						programParameters.constrain, calibrationParams,
+						depthInvScale, relativeTransformation, 1,
+						programParameters.TrackingFeatureNumber, false, true);
+
+				if (programParameters.verbose != 0) {
+					std::cout << "Loop closure success : "
+							<< transformationFound << std::endl;
+				}
+
+				if (transformationFound) {
+					saveG20Edge(g2o, firstFrame->vertexId,
+							secondFrame->vertexId,
+							relativeTransformation.inverse());
+					ileLC++;
+				}
+				i++;
+			}
+			else
+				break;
+
+		}
+
+	}
+	t << "LC : " << ileLC << std::endl;
+	t.close();
+
+	if (programParameters.verbose != 0) {
+		printf("Number of LC : %d \n", ileLC);
+
+		printf("Comparison after %d measurements\n",
+				tracking->measurementCounter);
+		printf("Detection time : %.4f ms\n",
+				tracking->detectionTime / tracking->measurementCounter * 1000);
+		printf("Description time : %.4f ms\n",
+				tracking->descriptionTime / tracking->measurementCounter
+						* 1000);
+		printf("Tracking time : %.4f ms\n",
+				tracking->trackingTime / tracking->measurementCounter * 1000);
+		printf("Matching time : %.4f ms\n",
+				tracking->matchingTime / tracking->measurementCounter * 1000);
+	}
 	estTrajectory.close();
 	g2o.close();
-
+	g2oIndices.close();
 
 	//showCloudXYZRGBA(partial_cloud[0]);
 	// Sum point cloud
-	if ( programParameters.visualization != 0)
-	{
+	if (programParameters.visualization != 0) {
 		cout << "Number of partial point clouds: " << saved_number << endl;
 
 		for (int i = 2; i < saved_number; i++) {
 
-			if ( i%5 == 2)
-			{
-			//	Eigen::Matrix4f tmp = KinectInitial.inverse() * transformation[i];
-			//	RGBD->TransformSelf(partial_cloud[i], tmp );
-				RGBD->TransformSelf(partial_cloud[i], transformation[i] );
-				cout<<"SUM"<<endl;
+			if (i % 5 == 2) {
+				//	Eigen::Matrix4f tmp = KinectInitial.inverse() * transformation[i];
+				//	RGBD->TransformSelf(partial_cloud[i], tmp );
+				RGBD->TransformSelf(partial_cloud[i], transformation[i]);
+				cout << "SUM" << endl;
 				*partial_cloud[0] = *partial_cloud[0] + *partial_cloud[i];
 			}
 		}
 
-		cout<<"VOXEL"<<endl;
-		partial_cloud[0] = VoxelGridFilter(partial_cloud[0],programParameters.LeafSize);
+		cout << "VOXEL" << endl;
+		partial_cloud[0] = VoxelGridFilter(partial_cloud[0],
+				programParameters.LeafSize);
 		RGBD->SaveCloudXYZRGBA("results.pcd", partial_cloud[0]);
 		cout << "Saving the sum point cloud" << endl;
 
