@@ -6,18 +6,28 @@
 
 int main(int argc, char *argv[]) {
 
-	Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
-	double angle = (18.0) * M_PI / 180.0;
-	transformation(0,0) = cos(angle);
-	transformation(0,1) = -sin(angle);
-	transformation(1,0) = sin(angle);
-	transformation(1,1) = cos(angle);
-
-	Eigen::Quaternion<float> Q(transformation.block<3, 3>(0, 0));
-	std::cout << " " << transformation(0, 3) << " "
-				<< transformation(1, 3) << " " << transformation(2, 3) << " "
-				<< Q.coeffs().x() << " " << Q.coeffs().y() << " " << Q.coeffs().z()
-				<< " " << Q.coeffs().w() << endl;
+//	Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
+////	double angle = (18.0) * M_PI / 180.0;
+////	transformation(0,0) = cos(angle);
+////	transformation(0,1) = -sin(angle);
+////	transformation(1,0) = sin(angle);
+////	transformation(1,1) = cos(angle);
+//	transformation(0,0) = 0.9998;
+//	transformation(0,1) = 0.0077;
+//	transformation(0,2) = 0.0039;
+//	transformation(1,0) = -0.0077;
+//	transformation(1,1) = 0.9998;
+//	transformation(1,2) = 0.0125;
+//	transformation(2,0) = -0.0038;
+//	transformation(2,1) = -0.0126;
+//	transformation(2,2) = 0.9998;
+//
+//
+//	Eigen::Quaternion<float> Q(transformation.block<3, 3>(0, 0));
+//	std::cout << " " << transformation(0, 3) << " "
+//				<< transformation(1, 3) << " " << transformation(2, 3) << " "
+//				<< Q.coeffs().x() << " " << Q.coeffs().y() << " " << Q.coeffs().z()
+//				<< " " << Q.coeffs().w() << endl;
 
 	if (argc == 4) {
 //			printf("File name %s\n",argv[1]);

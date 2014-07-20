@@ -60,6 +60,7 @@ private:
 	// My rounding
 	int roundX(double X);
 	int roundY(double Y);
+	int roundSize(double X, int size);
 
 	int computeRANSACIterationCount(double successRate, double inlierRate, int numberOfPairs = 3);
 

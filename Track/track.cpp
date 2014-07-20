@@ -2,9 +2,9 @@
 #include <pcl/common/time.h>
 
 Track::Track() {
-	for (int i = 0; i < 3; i++) {
-		frameD[i] = cv::Mat(480, 640, CV_32F);
-	}
+//	for (int i = 0; i < 3; i++) {
+//		frameD[i] = cv::Mat(480, 640, CV_32F);
+//	}
 	featureCounter = 5000;
 	vertexCounter = 0;
 
@@ -464,7 +464,7 @@ void Track::doTracking(ProgramParameters programParameters,
 		}
 	}
 
-//	std::cout<<"Tracking sizes: " << points[1].size()<<" " <<  points[2].size() << " " << pointsID.size() << " " << pointDepth.size()<< std::endl;
+	std::cout<<"Tracking sizes: " << points[1].size()<<" " <<  points[2].size() << " " << pointsID.size() << " " << pointDepth.size()<< std::endl;
 
 	std::swap(points[1], points[2]);
 	swap(frameBGR[1], frameBGR[2]);
@@ -493,6 +493,14 @@ int Track::roundY(double Y) {
 		Y = 0;
 	else if (Y > 479)
 		Y = 479;
+	return round(Y);
+}
+
+int Track::roundSize(double Y, int size) {
+	if (Y < 0)
+		Y = 0;
+	else if (Y > size - 1)
+		Y = size;
 	return round(Y);
 }
 
@@ -601,6 +609,9 @@ bool Track::robustTransformationEstimation(
 		}
 		float inlierPercentage = inlierCount * 100.0 / matchesSize;
 
+//		std::cout << "Liczba Dopasowanych [%]: "
+//						<< inlierPercentage << std::endl;
+
 		// From transfomation to euler/translation
 		float eulerAngleCheck[3];
 		TransformationToEuler(Optimal, eulerAngleCheck);
@@ -640,10 +651,10 @@ bool Track::robustTransformationEstimation(
 			break;
 		}
 	}
-//	if (programParameters.verbose != 0) {
-//		std::cout << std::endl << "Liczba Dopasowanych [%]: "
-//				<< BestInlierPercentage << std::endl;
-//	}
+	//if (programParameters.verbose != 0) {
+		std::cout << std::endl << "Best Liczba Dopasowanych [%]: "
+				<< BestInlierPercentage << std::endl;
+	//}
 	if (BestInlierPercentage < 15) {
 		Optimal = Eigen::Matrix4f::Identity();
 		return false;
@@ -653,29 +664,33 @@ bool Track::robustTransformationEstimation(
 	} else {
 
 		int prevIle;
-		for (int k = 0; k < 20; k++) {
+		for (int k = 0; k < 10; k++) {
 			// Again, reestimation from inliers
 			Eigen::MatrixXf P(BestInlierCount, 3), Q(BestInlierCount, 3);
-			for (int i = 0, k = 0; i < matchesSize; i++) {
+			int w = 0;
+			for (int i = 0; i < matchesSize; i++) {
 				if (isBestInlier[i] == true) {
-					P.block<1, 3>(k, 0) = firstKeypoints3d[matches[i].first];
-					Q.block<1, 3>(k, 0) = secondKeypoints3d[matches[i].second];
+					P.block<1, 3>(w, 0) = firstKeypoints3d[matches[i].first];
+					Q.block<1, 3>(w, 0) = secondKeypoints3d[matches[i].second];
 
 					if (saveInliers) {
 						wasInlierFirst[matches[i].first] = true;
 						wasInlierSecond[matches[i].second] = true;
 					}
-					k++;
+					w++;
 				}
 			}
 //			if (programParameters.verbose != 0) {
 //				std::cout << "Reestimation" << std::endl;
 //			}
 //			Kabsch(P, Q, Optimal);
+			double st = pcl::getTime();
 			Umeyama(P, Q, Optimal);
+			double en = pcl::getTime();
+			std::cout<<"Reestymacja zajela " << (en - st)*1224 << " dla " << w << " inlierów " << std::endl;
 			///!!!!!
 			int ile = 0;
-			for (int i = 0, k = 0; i < matchesSize; i++) {
+			for (int i = 0; i < matchesSize; i++) {
 				if (isBestInlier[i] == true) {
 					Eigen::Vector4f punkt;
 					punkt.head(3) = firstKeypoints3d[matches[i].first];
@@ -686,6 +701,9 @@ bool Track::robustTransformationEstimation(
 					if ((punkt.head(3) - secondKeypoints3d[matches[i].second]).norm()
 							> inliner_threshold) {
 						isBestInlier[i] = false;
+					}
+					else
+					{
 						ile++;
 					}
 				}
@@ -694,7 +712,7 @@ bool Track::robustTransformationEstimation(
 				inliner_threshold = 0.9 * inliner_threshold;
 			}
 			prevIle = ile;
-			if (ile < 30)
+			if (ile < 50)
 				break;
 		}
 	}
@@ -745,7 +763,22 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 			cv::Mat img_matches;
 			cv::drawMatches(firstFrame->imageRGB, x1, secondFrame->imageRGB, x2,
 					matches2Draw, img_matches);
-			cv::imshow("matches", img_matches);
+			cv::Mat imageShow;
+			cv::resize(img_matches, imageShow, cv::Size(1280, 480));
+
+			cv::Mat img_matches2,tmpx,tmpy;
+			firstFrame->imageD.copyTo(tmpx);
+			secondFrame->imageD.copyTo(tmpy);
+			tmpx = tmpx * 50; tmpy = tmpy * 50;
+			tmpx.convertTo(tmpx, CV_8U);
+			tmpy.convertTo(tmpy, CV_8U);
+			cv::drawMatches(tmpx, x1, tmpy, x2,
+				matches2Draw, img_matches2);
+			cv::Mat imageShow2;
+			cv::resize(img_matches2, imageShow2, cv::Size(1280, 480));
+
+			cv::imshow("matches", imageShow);
+			cv::imshow("matches2", imageShow2);
 			cv::waitKey(0);
 		}
 	} else {
@@ -817,9 +850,12 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 			int jj = 0;
 			for (std::vector<cv::KeyPoint>::iterator it = keypoints[k].begin();
 					it != keypoints[k].end(); jj++) {
-				double Z = double(
-						depthImg.at<uint16_t>(roundY(it->pt.y),
-								roundX(it->pt.x))) / depthInvScale;
+//				double Z = double(
+//						depthImg.at<uint16_t>(roundY(it->pt.y),
+//								roundX(it->pt.x))) / depthInvScale;
+
+				double Z = double(depthImg.at<uint16_t>(roundSize(it->pt.y, depthImg.rows),
+												roundSize(it->pt.x, depthImg.cols))) / depthInvScale;
 
 				if (fabs(Z) > 0.001) {
 					Eigen::Vector3f x = RGBDclass::point2Dto3D(points2d[jj], Z,
@@ -1055,9 +1091,11 @@ std::vector<int>::iterator itDepth = pointDepth.begin(), itID =
 for (std::vector<cv::Point2f>::iterator it = points[1].begin();
 		it != points[1].end(); ii++) {
 
-	double Z = double(frameD[2].at<uint16_t>(roundY(it->y), roundX(it->x)))
-			/ depthInvScale;
-	;
+//	double Z = double(frameD[2].at<uint16_t>(roundY(it->y), roundX(it->x)))
+//			/ depthInvScale;
+	double Z = double(frameD[2].at<uint16_t>(roundSize(it->y, frameD[2].rows), roundSize(it->x, frameD[2].cols)))
+				/ depthInvScale;
+
 	if (abs(Z) > 0.001) {
 		kbVertex.keypointsId.push_back(*itID);
 		kbVertex.keypoints.push_back(*it);
