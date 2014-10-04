@@ -18,13 +18,14 @@ call("rm *.pcd", shell=True);
 call("rm ../results/*", shell=True);
 
 # Dataset image counter
-p = subprocess.Popen("cat matchedIndices | wc -l", stdout=subprocess.PIPE, shell=True);
+p = subprocess.Popen("cat matched | wc -l", stdout=subprocess.PIPE, shell=True);
 numberOfImages, err = p.communicate();
 
 
 # Running program
 call("./kinect " + numberOfImages.rstrip() +" " + str(scale), shell=True);
-#call("./kinect " + "200" + " " + str(scale), shell=True);
+#call("./kinect " + "150" + " " + str(scale), shell=True);
+
 
 # Running evaluation
 if "SSRR" in dataset:

@@ -1,5 +1,6 @@
 #include "kinect.h"
 #include <pcl/common/time.h>
+#include <float.h>
 
 bool geometricDistanceCompare(geometricDistance i, geometricDistance j) {
 	return i.distance < j.distance;
@@ -115,6 +116,13 @@ void Kinect::ReadParameters() {
 			programParameters.DBScanEps = atoi(linia.c_str());
 		}
 		//
+		// Quadtree
+		//
+		else if (linia == "# Quadtree on/off") {
+			o >> linia;
+			programParameters.Quadtree = atoi(linia.c_str());
+		}
+		//
 		// Transformation estimation
 		//
 		else if (linia == "# Number of pairs used for estimation") {
@@ -189,9 +197,15 @@ void Kinect::ReadParameters() {
 		} else if (linia == "# Showing tracking") {
 			o >> linia;
 			programParameters.showTracking = atoi(linia.c_str());
+		} else if (linia == "# Transformation Uncertainty") {
+			o >> linia;
+			programParameters.transformationUncertainty = atoi(linia.c_str());
 		} else if (linia == "# g2o with features") {
 			o >> linia;
 			programParameters.g2oWithFeatures = atoi(linia.c_str());
+		} else if (linia == "# g2o with TRACKXYZ") {
+			o >> linia;
+			programParameters.g2oWithTRACKXYZ = atoi(linia.c_str());
 		} else if (linia == "# g2o vs sba save file") {
 			o >> linia;
 			programParameters.g2o_vs_sba = atoi(linia.c_str());
@@ -353,12 +367,98 @@ void Kinect::saveG20Edge(std::ofstream& g2o, const int vertex1Id,
 	}
 }
 
+void Kinect::saveG20Edge(std::ofstream& g2o, const int vertex1Id,
+		const int vertex2Id, Eigen::Matrix4f transformation, Eigen::Matrix<double, 6, 6> transInfMatrix) {
+	Eigen::Quaternion<float> Q(transformation.block<3, 3>(0, 0));
+
+	if (std::isfinite(transformation(0, 3))
+			&& std::isfinite(transformation(1, 3))
+			&& std::isfinite(transformation(2, 3))
+			&& std::isfinite(transformation(3, 3))
+			&& std::isfinite(Q.coeffs().x()) && std::isfinite(Q.coeffs().y())
+			&& std::isfinite(Q.coeffs().z()) && std::isfinite(Q.coeffs().w())
+			&& transformation(0, 3) < 100 && transformation(1, 3) < 100
+			&& transformation(2, 3) < 100) {
+		g2o << "EDGE_SE3:QUAT " << vertex1Id << " " << vertex2Id << " "
+				<< transformation(0, 3) << " " << transformation(1, 3) << " "
+				<< transformation(2, 3) << " " << Q.coeffs().x() << " "
+				<< Q.coeffs().y() << " " << Q.coeffs().z() << " "
+				<< Q.coeffs().w() << " "
+				<< transInfMatrix(0, 0) << " "
+				<< transInfMatrix(0, 1) << " "
+				<< transInfMatrix(0, 2) << " "
+				<< transInfMatrix(0, 3) << " "
+				<< transInfMatrix(0, 4) << " "
+				<< transInfMatrix(0, 5) << " "
+				<< transInfMatrix(1, 1) << " "
+				<< transInfMatrix(1, 2) << " "
+				<< transInfMatrix(1, 3) << " "
+				<< transInfMatrix(1, 4) << " "
+				<< transInfMatrix(1, 5) << " "
+				<< transInfMatrix(2, 2) << " "
+				<< transInfMatrix(2, 3) << " "
+				<< transInfMatrix(2, 4) << " "
+				<< transInfMatrix(2, 5) << " "
+				<< transInfMatrix(3, 3) << " "
+				<< transInfMatrix(3, 4) << " "
+				<< transInfMatrix(3, 5) << " "
+				<< transInfMatrix(4, 4) << " "
+				<< transInfMatrix(4, 5) << " "
+				<< transInfMatrix(5, 5) << endl;
+	}
+}
+
+
+void Kinect::saveG20EdgeTRACKXYZ(std::ofstream& g2o, const kabschVertex& tmpVertex,
+		int i) {
+	g2o << "EDGE_SE3_TRACKXYZ " << tmpVertex.vertexId << " "
+			<< tmpVertex.keypointsId[i] << " 0 " << tmpVertex.keypoints3d[i][0]
+			<< " " << tmpVertex.keypoints3d[i][1] << " "
+			<< tmpVertex.keypoints3d[i][2] << " "
+			<< tmpVertex.informationMatrix[i](0, 0) << " "
+			<< tmpVertex.informationMatrix[i](0, 1) << " "
+			<< tmpVertex.informationMatrix[i](0, 2) << " "
+			<< tmpVertex.informationMatrix[i](1, 1) << " "
+			<< tmpVertex.informationMatrix[i](1, 2) << " "
+			<< tmpVertex.informationMatrix[i](2, 2) << std::endl;
+}
+
+void Kinect::saveG2OnonExistingFeatures(std::ofstream& g2o, const int vertex1Id,
+		const int vertex2Id, int nonExistingFeatureCounter) {
+
+	for (int i=0;i<2;i++)
+	{
+		for (int j=0;j<2;j++)
+		{
+			for (int k = 0; k < 2; k++) {
+				g2o << "EDGE_SE3_TRACKXYZ " << vertex1Id << " "
+						<< nonExistingFeatureCounter + i * 4 + j * 2 + k
+						<< " 0 " << -1.0 + i * 2.0 << " " << -1.0 + j * 2.0 << " " << -1.0 + k * 2.0 << " "
+						<< FLT_MAX << " 0 0 " << FLT_MAX << " 0 " << FLT_MAX
+						<< std::endl;
+				g2o << "EDGE_SE3_TRACKXYZ " << vertex2Id << " "
+										<< nonExistingFeatureCounter + i * 4 + j * 2 + k
+										<< " 0 " << -1.0 + i * 2.0 << " " << -1.0 + j * 2.0 << " " << -1.0 + k * 2.0 << " "
+										<< FLT_MAX << " 0 0 " << FLT_MAX << " 0 " << FLT_MAX
+										<< std::endl;
+			}
+		}
+	}
+
+
+}
+
+void Kinect::saveG2OcameraPos(std::ofstream& g2o) {
+	g2o << "PARAMS_SE3OFFSET 0 0 0 0 0 0 0 1 " << endl;
+}
+
 void Kinect::saveG20Fix(std::ofstream& g2o, const int id) {
 	g2o << "FIX " << id << endl;
 }
 
 void Kinect::findAndSaveG20Features(kabschVertex& frame, std::ofstream& g2o,
-		const int firstOrSecond) {
+		const int firstOrSecond, const int g2oWithTRACKXYZ) {
+
 
 	if (firstOrSecond == 1) {
 		for (int i = 0; i < tracking->wasInlierFirst.size(); i++) {
@@ -366,7 +466,10 @@ void Kinect::findAndSaveG20Features(kabschVertex& frame, std::ofstream& g2o,
 					&& frame.inGraph[i] == false) {
 				frame.inGraph[i] = true;
 
-				saveG20Edge(g2o, frame, i);
+				if (g2oWithTRACKXYZ > 0)
+					saveG20EdgeTRACKXYZ(g2o, frame, i);
+				else
+					saveG20Edge(g2o, frame, i);
 			}
 		}
 		tracking->wasInlierFirst.clear();
@@ -375,15 +478,31 @@ void Kinect::findAndSaveG20Features(kabschVertex& frame, std::ofstream& g2o,
 			if (tracking->wasInlierSecond[i] == true
 					&& frame.inGraph[i] == false) {
 				frame.inGraph[i] = true;
-				saveG20Edge(g2o, frame, i);
+				if (g2oWithTRACKXYZ > 0)
+					saveG20EdgeTRACKXYZ(g2o, frame, i);
+				else
+					saveG20Edge(g2o, frame, i);
 			}
 		}
-		// WTF! TODO: To nie bug, ale nie pamietam o co chodzi ;d
+		// To jest kwestia BA -> z aktualnej klatki zapisujemy inlier z
+		// jakiejkolwiek transformacji, wiec nie zerujemy licznika, chociaz powinnismy
 		tracking->wasInlierFirst.clear();
 		//tracking->wasInlierSecond.clear();
 	}
 }
 
+
+void Kinect::saveG2OVertexPosition(Eigen::Matrix4f transformation,
+		std::ofstream & estTrajectory, const int vertexId) {
+	// Saving estimate in Freiburg format
+
+	//VERTEX_SE3:QUAT 1 1.32118 0.840088 1.5281 0.891676 0.211772 -0.0878279 -0.390324
+	Eigen::Quaternion<float> Q(transformation.block<3, 3>(0, 0));
+	estTrajectory << "VERTEX_SE3:QUAT " << vertexId << " " << transformation(0, 3) << " "
+			<< transformation(1, 3) << " " << transformation(2, 3) << " "
+			<< Q.coeffs().x() << " " << Q.coeffs().y() << " " << Q.coeffs().z()
+			<< " " << Q.coeffs().w() << endl;
+}
 void Kinect::TrackingRun() {
 
 	// Locally used variables
@@ -402,6 +521,12 @@ void Kinect::TrackingRun() {
 	estTrajectory.open("../results/result");
 	g2o.open("../results/graphFile.g2o");
 	g2oIndices.open("../results/g2oIndices");
+
+	// Using TRACKXYZ we need to set up the camera position
+	if (programParameters.g2oWithTRACKXYZ > 0)
+	{
+		saveG2OcameraPos(g2o);
+	}
 
 	// Creating the core
 	tracking = new Track();
@@ -453,11 +578,24 @@ void Kinect::TrackingRun() {
 	saveG20Vertex(transformation[0], g2o, tmpVertex);
 	saveG20Fix(g2o, tmpVertex.vertexId);
 
+	std::cout<<" programParameters.g2oWithTRACKXYZ " << programParameters.g2oWithTRACKXYZ<< std::endl;
+	std::cout<<" programParameters.g2oWithFeatures " << programParameters.g2oWithFeatures<< std::endl;
+	std::cout<<" programParameters.transformationUncertainty " << programParameters.transformationUncertainty<< std::endl;
+
 	if (programParameters.g2oWithFeatures > 0) {
-		for (int i = 0; i < tmpVertex.keypointsId.size(); i++) {
-			saveG20Vertex(Eigen::Matrix4f::Identity(), g2o,
-					tmpVertex.keypointsId[i]);
-			saveG20Edge(g2o, tmpVertex, i);
+		if (programParameters.g2oWithTRACKXYZ > 0) {
+			for (int i = 0; i < tmpVertex.keypointsId.size(); i++) {
+//				saveG20Vertex(Eigen::Matrix4f::Identity(), g2o,
+//						tmpVertex.keypointsId[i]);
+				saveG20EdgeTRACKXYZ(g2o,tmpVertex, i);
+			}
+
+		} else {
+			for (int i = 0; i < tmpVertex.keypointsId.size(); i++) {
+				saveG20Vertex(Eigen::Matrix4f::Identity(), g2o,
+						tmpVertex.keypointsId[i]);
+				saveG20Edge(g2o, tmpVertex, i);
+			}
 		}
 	}
 
@@ -531,27 +669,42 @@ void Kinect::TrackingRun() {
 				}
 				bool saveInliers =  !programParameters.trackingMatching;//( y == bundleAdjustmentStop - 1);
 				// Estimating transformation
+				Eigen::Matrix<double, 6, 6> transUncertainty;
+				// Returns the uncertainty of the INVERSE of the transformation !!!!
 				bool transformationFound = tracking->estimateTransformation(
 						firstFrame, secondFrame, programParameters,
 						programParameters.constrain, calibrationParams,
-						depthInvScale, relativeTransformation,
+						depthInvScale, relativeTransformation, transUncertainty,
 						programParameters.trackingMatching,
 						programParameters.TrackingFeatureNumber,
 						saveInliers);
 
 				// Adding inlier features to graph
 				if (programParameters.g2oWithFeatures > 0) {
+
+					// Wont work with BA
+					saveG2OVertexPosition(transformation[saved_number - 1]
+					 									* relativeTransformation.inverse(), g2o, secondFrame->vertexId);
+
 					if (transformationFound)
-						findAndSaveG20Features(*firstFrame, g2o, 1);
+						findAndSaveG20Features(*firstFrame, g2o, 1, programParameters.g2oWithTRACKXYZ);
 					else if (y == bundleAdjustmentStop - 1)
+					{
 						saveG20Edge(g2o, firstFrame->vertexId,
-								secondFrame->vertexId,
-								Eigen::Matrix4f::Identity());
+														secondFrame->vertexId,
+														Eigen::Matrix4f::Identity());
+						// CHANGE IT
+//						saveG2OnonExistingFeatures(g2o, firstFrame->vertexId,
+//								secondFrame->vertexId, tracking->nonExistingFeatureCounter);
+//						tracking->nonExistingFeatureCounter += 8;
+//						tracking->vertexCounter -= 1;
+//						secondFrame->vertexId -= 1;
+					}
 				}
 				// G20 w/o features
 				else if (transformationFound) {
 					saveG20Edge(g2o, firstFrame->vertexId, secondFrame->vertexId,
-							relativeTransformation.inverse());
+							relativeTransformation.inverse(), transUncertainty.inverse());
 				}
 				// No transformation found to the last frame -- adding identity to have continuous graph
 				else if (y == bundleAdjustmentStop - 1) {
@@ -564,7 +717,7 @@ void Kinect::TrackingRun() {
 
 			// Adding current frame inlier features to graph
 			if (programParameters.g2oWithFeatures > 0) {
-				findAndSaveG20Features(*secondFrame, g2o, 2);
+				findAndSaveG20Features(*secondFrame, g2o, 2, programParameters.g2oWithTRACKXYZ);
 			}
 
 			// HACK for reading KW's results
@@ -609,6 +762,7 @@ void Kinect::TrackingRun() {
 			// Saving in freiburg
 			saveTrajectory(transformation[saved_number], estTrajectory,
 					timestamp);
+
 
 			// Attemp to perform loop closure
 //			if (programParameters.matchingLoopClosure == 1) {
@@ -752,10 +906,12 @@ void Kinect::TrackingRun() {
 				kabschVertex *secondFrame =
 						&tracking->vertexHistory[tmp.j];
 
+				Eigen::Matrix<double, 6, 6> transUncertainty;
+				// Returns the uncertainty of the INVERSE of returned transformation!!!
 				bool transformationFound = tracking->estimateTransformation(
 						firstFrame, secondFrame, programParameters,
 						programParameters.constrain, calibrationParams,
-						depthInvScale, relativeTransformation, 1,
+						depthInvScale, relativeTransformation, transUncertainty,  1,
 						programParameters.TrackingFeatureNumber, false, true);
 
 				if (programParameters.verbose != 0) {
@@ -766,7 +922,7 @@ void Kinect::TrackingRun() {
 				if (transformationFound) {
 					saveG20Edge(g2o, firstFrame->vertexId,
 							secondFrame->vertexId,
-							relativeTransformation.inverse());
+							relativeTransformation.inverse(), transUncertainty.inverse());
 					ileLC++;
 				}
 				i++;
@@ -794,6 +950,9 @@ void Kinect::TrackingRun() {
 				tracking->trackingTime / tracking->measurementCounter * 1000);
 		printf("Matching time : %.4f ms\n",
 				tracking->matchingTime / tracking->measurementCounter * 1000);
+
+		printf("DBScan time : %.4f ms\n",
+						tracking->dbscanOrQuadtreeTime / tracking->dbscanOrQuadtreeCounter * 1000);
 	}
 	estTrajectory.close();
 	g2o.close();

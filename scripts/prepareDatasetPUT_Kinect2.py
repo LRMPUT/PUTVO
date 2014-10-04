@@ -53,7 +53,7 @@ for i in range(1,int(numberOfImages)+1):
 		call("convert ../../Datasets/"+dataset+"/color/"+str(rgbName.rstrip())+" ./rgb_%0.5d.png" % (i), shell=True);
 	else:
 		call("cp ../../Datasets/"+dataset+"/color/"+str(rgbName.rstrip())+" ./rgb_%0.5d.png" % (i), shell=True);
-	call("cp ../../Datasets/"+dataset+"/depthColor/"+str(dName.rstrip())+ " ./depth_%0.5d.png" % (i), shell=True);
+	call("cp ../../Datasets/"+dataset+"/depth*/"+str(dName.rstrip())+ " ./depth_%0.5d.png" % (i), shell=True);
 
 	# Saving matches indices
 	myFile.write(str(i) + "\t" + str(i) + "\n")

@@ -15,7 +15,7 @@ call("rm matchedIndices", shell=True);
 
 # Finding matches
 call("python2 ../scripts/associate.py ../../Datasets/"+dataset+"/rgb.txt ../../Datasets/"+dataset+"/depth.txt > matched", shell=True);
-myFile = open('matchedIndices', 'w')
+myFile = open('fileNames', 'w')
 
 # Dataset image counter
 imagesCount=call("cat matched | wc -l", shell=True);
@@ -28,9 +28,10 @@ call("cp ../../Datasets/"+dataset+"/groundtruth*.txt ./groundtruth.txt", shell=T
 # Copying camera parameters
 if "freiburg1" in dataset:
 	call("cp ../cameraFr1.cfg ../camera.cfg", shell=True); 
-else:
+elif "freiburg2" in dataset:
 	call("cp ../cameraFr2.cfg ../camera.cfg", shell=True); 
-
+else:
+	call("cp ../cameraFr3.cfg ../camera.cfg", shell=True); 
 # Copy images with new names
 for i in range(1,int(numberOfImages)+1):
 	   
@@ -50,11 +51,12 @@ for i in range(1,int(numberOfImages)+1):
 	print(str(i)+"/"+ (numberOfImages.rstrip())+"\t" + rgbName.rstrip() + "\t" + dName.rstrip());
 	
 	# Copying images
-	call("cp ../../Datasets/"+dataset+"/rgb/"+str(rgbName.rstrip())+".png ./rgb_%0.4d.png" % (i), shell=True);
-	call("cp ../../Datasets/"+dataset+"/depth/"+str(dName.rstrip())+".png ./depth_%0.4d.png" % (i), shell=True);
+	call("cp ../../Datasets/"+dataset+"/rgb/"+str(rgbName.rstrip())+".png ./rgb_%0.5d.png" % (i), shell=True);
+	call("cp ../../Datasets/"+dataset+"/depth/"+str(dName.rstrip())+".png ./depth_%0.5d.png" % (i), shell=True);
 	
 	# Saving matches indices
-	myFile.write(rgbName.rstrip() + "\t" + dName.rstrip() + "\n")
+	if i % 3 == 1:
+		myFile.write(rgbName.rstrip() + "\t" + dName.rstrip() + "\n")
 
 	# Saving initial position from gt
 	if i==1:
@@ -66,5 +68,7 @@ for i in range(1,int(numberOfImages)+1):
 		call("rm test init", shell=True);
 
 myFile.close()
-
+p1 = subprocess.Popen("cat matched", stdout=subprocess.PIPE, shell=True);
+p2 = subprocess.Popen("cut -d' ' -f 1,3", stdin=p1.stdout, stdout=subprocess.PIPE, shell=True);
+p3 = subprocess.Popen("tr ' ' \\\\t > matchedIndices", stdin=p2.stdout, stdout=subprocess.PIPE, shell=True);	
 

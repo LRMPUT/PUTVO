@@ -6,6 +6,16 @@
 
 int main(int argc, char *argv[]) {
 
+//	cv::Mat x = cv::imread("Color_000008.png"), y;
+//	std::vector<cv::KeyPoint> keypointsX;
+//
+//	cv::FastFeatureDetector fastDetector(75);
+//	fastDetector.detect(x, keypointsX);
+//	cv::drawKeypoints(x, keypointsX, y, cv::Scalar(0,0,255));
+//
+//	//cv::imshow("matches2", y);
+//	cv::imwrite("Color2_000008.png",y);
+//	return 0;
 //	Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
 ////	double angle = (18.0) * M_PI / 180.0;
 ////	transformation(0,0) = cos(angle);

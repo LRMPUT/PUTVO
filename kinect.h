@@ -70,8 +70,19 @@ private:
 			int i);
 	void saveG20Edge(std::ofstream& g2o, const int vertex1Id,
 			const int vertex2Id, Eigen::Matrix4f transformation);
+	void saveG20Edge(std::ofstream& g2o, const int vertex1Id,
+			const int vertex2Id, Eigen::Matrix4f transformation,
+			Eigen::Matrix<double, 6, 6> transInfMatrix);
+	void saveG20EdgeTRACKXYZ(std::ofstream& g2o, const kabschVertex& tmpVertex,
+			int i);
+	void saveG2OnonExistingFeatures(std::ofstream& g2o, const int vertex1Id,
+			const int vertex2Id, int nonExistingFeatureCounter);
+	void saveG2OcameraPos(std::ofstream& g2o);
 	void saveG20Fix(std::ofstream& g2o, const int id);
 
-	void findAndSaveG20Features(kabschVertex& secondFrame, std::ofstream& g2o, const int firstOrSecond);
+	void findAndSaveG20Features(kabschVertex& secondFrame, std::ofstream& g2o,
+			const int firstOrSecond, const int g2oWithTRACKXYZ);
+	void saveG2OVertexPosition(Eigen::Matrix4f transformation,
+			std::ofstream & estTrajectory, const int vertexId);
 };
 #endif

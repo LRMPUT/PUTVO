@@ -5,13 +5,16 @@ Track::Track() {
 //	for (int i = 0; i < 3; i++) {
 //		frameD[i] = cv::Mat(480, 640, CV_32F);
 //	}
-	featureCounter = 5000;
+	featureCounter = 10000;
+	nonExistingFeatureCounter = 5000;
 	vertexCounter = 0;
 
 	detectionTime = 0;
 	descriptionTime = 0;
 	trackingTime = 0;
 	matchingTime = 0;
+	dbscanOrQuadtreeTime = 0;
+	dbscanOrQuadtreeCounter = 0;
 	measurementCounter = 0;
 }
 
@@ -217,6 +220,9 @@ void Track::newDetection(ProgramParameters programParameters,
 
 	// If we can use DBScan
 	if (programParameters.DBScan == 1) {
+
+		double a = pcl::getTime();
+
 		std::vector<int> clusters;
 		DBScan dbscan(programParameters.DBScanEps,
 				programParameters.DBScanMinPts);
@@ -265,7 +271,32 @@ void Track::newDetection(ProgramParameters programParameters,
 				keypoints.push_back(keypointClusterSet[i].first);
 			}
 		}
+
+		double b = pcl::getTime();
+
+		dbscanOrQuadtreeTime += (b-a);
+		dbscanOrQuadtreeCounter ++;
+		std::cout<<"DBSCAN: Measured time is " << b - a << std::endl;
+
 		//	std::cout << "Number of features AFTER dbscan:" << keypoints.size()
+	}
+	else if (programParameters.Quadtree == 1) {
+
+		double a = pcl::getTime();
+		Quadtree mojeDrzewo(0, 0, frameBGR[0].cols, frameBGR[0].rows, 5);
+
+		for (int i = 0; i < (int) keypoints.size(); i++) {
+			mojeDrzewo.insert(keypoints[i].pt);
+		}
+
+		cv::Mat whatever;
+		std::vector<cv::KeyPoint> keypointsOut;
+		Quadtree::EDfilter(frameBGR[0], whatever, keypointsOut, &mojeDrzewo, programParameters.TrackingFeatureNumber*3.0/4);
+		keypointsOut.swap(keypoints);
+
+		double b = pcl::getTime();
+		dbscanOrQuadtreeTime += (b-a);
+		dbscanOrQuadtreeCounter ++;
 	}
 	if (programParameters.verbose != 0) {
 		printf("Detected %lu points\n", keypoints.size());
@@ -275,17 +306,19 @@ void Track::newDetection(ProgramParameters programParameters,
 	points[2].clear();
 
 	std::vector<cv::Point2f>::iterator it = points[1].begin();
-	std::vector<int>::iterator itDepth = pointDepth.begin(), itID =
-			pointsID.begin();
+	std::vector<double>::iterator itDepth = pointDepth.begin();
+	std::vector<int>::iterator itID = pointsID.begin();
 	if (programParameters.verbose != 0) {
 		printf("There was %lu (%lu)\n", wasInlierSecond.size(),
 				points[1].size());
 	}
 	int featuresToCpy = 0;
+	// TODO: TEST
+	// Not leaving last features
 	for (int i = 0; i < wasInlierSecond.size(); i++) {
 		if (!wasInlierSecond[i]
 				|| featuresToCpy
-						> 0.5 * programParameters.TrackingFeatureNumber) {
+						> 0.65 * programParameters.TrackingFeatureNumber) {
 			it = points[1].erase(it);
 			itDepth = pointDepth.erase(itDepth);
 			itID = pointsID.erase(itID);
@@ -294,8 +327,10 @@ void Track::newDetection(ProgramParameters programParameters,
 			featuresToCpy++;
 		}
 	}
+
 	if (programParameters.verbose != 0) {
-		printf("There is %lu \n", points[1].size());
+		printf("There is %lu %lu %lu\n", points[1].size(), pointDepth.size(),
+				pointsID.size());
 	}
 	wasInlierSecond.clear();
 
@@ -328,6 +363,7 @@ void Track::newDetection(ProgramParameters programParameters,
 	kbVertex.imageRGB = frameBGR[0].clone();
 	kbVertex.imageD = frameD[0].clone();
 	int ii = 0;
+
 	for (std::vector<cv::Point2f>::iterator it = points[1].begin();
 			it != points[1].end(); it++, ii++) {
 		kbVertex.keypointsId.push_back(pointsID[ii]);
@@ -429,7 +465,7 @@ void Track::doTracking(ProgramParameters programParameters,
 
 	std::vector<uchar> status;
 	std::vector<float> err;
-	cv::TermCriteria termcrit(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 15, 0.05);
+	cv::TermCriteria termcrit(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 30, 0.01);
 
 	performedTrack = true;
 
@@ -448,8 +484,8 @@ void Track::doTracking(ProgramParameters programParameters,
 
 //	std::cout<<"Tracking sizes pre removal: " << points[1].size()<<" " <<  points[2].size() << " " << pointsID.size() << " " << pointDepth.size()<< std::endl;
 
-	std::vector<int>::iterator depthIt = pointDepth.begin(), IdIt =
-			pointsID.begin();
+	std::vector<double>::iterator depthIt = pointDepth.begin();
+	std::vector<int>::iterator IdIt = pointsID.begin();
 	std::vector<cv::Point2f>::iterator it = points[2].begin();
 	for (; it != points[2].end(); i++) {
 		if (status[i] == 0) {
@@ -458,13 +494,18 @@ void Track::doTracking(ProgramParameters programParameters,
 			it = points[2].erase(it);
 			//	std::cout<<"Status["<<i<<"] = 0" << std::endl;
 		} else {
+//			if (cv::norm(points[1][i] - *it) > 50)
+//				std::cout << "HALO! COS NIE TAK : "
+//						<< cv::norm(points[1][i] - *it) << std::endl;
 			++it;
 			++depthIt;
 			++IdIt;
 		}
 	}
 
-	std::cout<<"Tracking sizes: " << points[1].size()<<" " <<  points[2].size() << " " << pointsID.size() << " " << pointDepth.size()<< std::endl;
+	std::cout << "Tracking sizes: " << points[1].size() << " "
+			<< points[2].size() << " " << pointsID.size() << " "
+			<< pointDepth.size() << std::endl;
 
 	std::swap(points[1], points[2]);
 	swap(frameBGR[1], frameBGR[2]);
@@ -527,7 +568,8 @@ bool Track::robustTransformationEstimation(
 		double inliner_threshold,
 		const std::vector<Eigen::Vector3f> secondKeypoints3d,
 		const Constraints& constraints, double ransac_break_percent,
-		Eigen::Matrix4f &Optimal, bool saveInliers, bool turnOffConstrains, std::vector<bool> &isBestInlier) {
+		Eigen::Matrix4f &Optimal, bool saveInliers, bool turnOffConstrains,
+		std::vector<bool> &isBestInlier) {
 
 	// RANSAC preparation
 	int iterationNumber = computeRANSACIterationCount(0.99, 0.10, pair_number);
@@ -652,10 +694,10 @@ bool Track::robustTransformationEstimation(
 		}
 	}
 	//if (programParameters.verbose != 0) {
-		std::cout << std::endl << "Best Liczba Dopasowanych [%]: "
-				<< BestInlierPercentage << std::endl;
+	std::cout << std::endl << "Best Liczba Dopasowanych [%]: "
+			<< BestInlierPercentage << std::endl;
 	//}
-	if (BestInlierPercentage < 15) {
+	if (BestInlierPercentage < 25) {
 		Optimal = Eigen::Matrix4f::Identity();
 		return false;
 	} else if (turnOffConstrains && BestInlierPercentage < 25) {
@@ -664,7 +706,8 @@ bool Track::robustTransformationEstimation(
 	} else {
 
 		int prevIle;
-		for (int k = 0; k < 10; k++) {
+//		for (int k = 0; k < 10; k++) {
+		for (int k = 0; k < 1; k++) {
 			// Again, reestimation from inliers
 			Eigen::MatrixXf P(BestInlierCount, 3), Q(BestInlierCount, 3);
 			int w = 0;
@@ -687,7 +730,8 @@ bool Track::robustTransformationEstimation(
 			double st = pcl::getTime();
 			Umeyama(P, Q, Optimal);
 			double en = pcl::getTime();
-			std::cout<<"Reestymacja zajela " << (en - st)*1224 << " dla " << w << " inlierów " << std::endl;
+			std::cout << "Reestymacja zajela " << (en - st) * 1224 << " dla "
+					<< w << " inlierów " << std::endl;
 			///!!!!!
 			int ile = 0;
 			for (int i = 0; i < matchesSize; i++) {
@@ -701,9 +745,7 @@ bool Track::robustTransformationEstimation(
 					if ((punkt.head(3) - secondKeypoints3d[matches[i].second]).norm()
 							> inliner_threshold) {
 						isBestInlier[i] = false;
-					}
-					else
-					{
+					} else {
 						ile++;
 					}
 				}
@@ -712,7 +754,7 @@ bool Track::robustTransformationEstimation(
 				inliner_threshold = 0.9 * inliner_threshold;
 			}
 			prevIle = ile;
-			if (ile < 50)
+			if (ile < 100)
 				break;
 		}
 	}
@@ -722,7 +764,8 @@ bool Track::robustTransformationEstimation(
 bool Track::estimateTransformation(kabschVertex *firstFrame,
 		kabschVertex *secondFrame, ProgramParameters programParameters,
 		Constraints constraints, CalibrationParameters cameraParameters,
-		double depthInvScale, Eigen::Matrix4f &res, bool matching,
+		double depthInvScale, Eigen::Matrix4f &res,
+		Eigen::Matrix<double, 6, 6> &transUncertainty, bool matching,
 		int numberOfFeatures, bool saveInliers, bool turnOffConstrains) {
 
 	float data[5] = { cameraParameters.k1, cameraParameters.k2,
@@ -739,6 +782,7 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 	std::vector<Eigen::Vector3f> keypointsToPass[2];
 	std::vector<std::pair<int, int> > matches;
 
+	// TRACKING
 	if (matching == false) {
 		// Finding matches
 		std::vector<cv::DMatch> matches2Draw;
@@ -752,6 +796,8 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 			}
 		}
 		if (programParameters.verbose != 0) {
+			std::cout << "SIZES: " << firstFrame->keypoints.size() << " "
+					<< secondFrame->keypoints.size() << std::endl;
 			std::cout << "Number of matches: " << matches2Draw.size()
 					<< std::endl;
 		}
@@ -766,14 +812,14 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 			cv::Mat imageShow;
 			cv::resize(img_matches, imageShow, cv::Size(1280, 480));
 
-			cv::Mat img_matches2,tmpx,tmpy;
+			cv::Mat img_matches2, tmpx, tmpy;
 			firstFrame->imageD.copyTo(tmpx);
 			secondFrame->imageD.copyTo(tmpy);
-			tmpx = tmpx * 50; tmpy = tmpy * 50;
+			tmpx = tmpx * 50;
+			tmpy = tmpy * 50;
 			tmpx.convertTo(tmpx, CV_8U);
 			tmpy.convertTo(tmpy, CV_8U);
-			cv::drawMatches(tmpx, x1, tmpy, x2,
-				matches2Draw, img_matches2);
+			cv::drawMatches(tmpx, x1, tmpy, x2, matches2Draw, img_matches2);
 			cv::Mat imageShow2;
 			cv::resize(img_matches2, imageShow2, cv::Size(1280, 480));
 
@@ -815,22 +861,38 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 			cv::Mat rgbImg, depthImg;
 			if (k == 0) {
 
-				//printf("First frame size: %lu %d %d\n",firstFrame->matchingKeypoints3d.size(), firstFrame->descriptors.rows, firstFrame->descriptors.cols  );
-
-			   if (programParameters.g2o_vs_sba == false && firstFrame->matchingKeypoints3d.size() > 0)
-					continue;
+				if (programParameters.verbose != 0) {
+					printf("First frame size: %lu %d %d\n",
+							firstFrame->matchingKeypoints3d.size(),
+							firstFrame->descriptors.rows,
+							firstFrame->descriptors.cols);
+				}
+//				if (programParameters.g2o_vs_sba == false
+//						&& firstFrame->matchingKeypoints3d.size() > 0)
+//					continue;
 				rgbImg = firstFrame->imageRGB;
 				depthImg = firstFrame->imageD;
 			} else {
-//				printf("Second frame size: %lu %d %d\n",secondFrame->matchingKeypoints3d.size(), secondFrame->descriptors.rows, secondFrame->descriptors.cols    );
-				if (programParameters.g2o_vs_sba == false && secondFrame->matchingKeypoints3d.size() > 0)
-					continue;
+				if (programParameters.verbose != 0) {
+					printf("Second frame size: %lu %d %d\n",
+							secondFrame->matchingKeypoints3d.size(),
+							secondFrame->descriptors.rows,
+							secondFrame->descriptors.cols);
+				}
+//				if (programParameters.g2o_vs_sba == false
+//						&& secondFrame->matchingKeypoints3d.size() > 0)
+//					continue;
 				rgbImg = secondFrame->imageRGB;
 				depthImg = secondFrame->imageD;
 			}
 
 			featureDetector->detect(rgbImg, keypoints[k]);
-//			std::cout<<"Features found " << keypoints[k].size() << std::endl;
+			if (programParameters.verbose != 0) {
+				std::cout << "Image size " << rgbImg.rows << " " << rgbImg.cols
+						<< std::endl;
+				std::cout << "Features found " << keypoints[k].size()
+						<< std::endl;
+			}
 			if (keypoints[k].size() == 0) {
 				res = Eigen::Matrix4f::Identity();
 				return false;
@@ -854,8 +916,11 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 //						depthImg.at<uint16_t>(roundY(it->pt.y),
 //								roundX(it->pt.x))) / depthInvScale;
 
-				double Z = double(depthImg.at<uint16_t>(roundSize(it->pt.y, depthImg.rows),
-												roundSize(it->pt.x, depthImg.cols))) / depthInvScale;
+				double Z = double(
+						depthImg.at<uint16_t>(
+								roundSize(it->pt.y, depthImg.rows),
+								roundSize(it->pt.x, depthImg.cols)))
+						/ depthInvScale;
 
 				if (fabs(Z) > 0.001) {
 					Eigen::Vector3f x = RGBDclass::point2Dto3D(points2d[jj], Z,
@@ -902,7 +967,7 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 					<< secondFrame->descriptors.rows << " "
 					<< secondFrame->descriptors.cols << std::endl;
 			std::cout << "Matching keypoints: " << keypoints[0].size() << " "
-								<< keypoints[1].size() << std::endl;
+					<< keypoints[1].size() << std::endl;
 		}
 		matcher->match(firstFrame->descriptors, secondFrame->descriptors,
 				matchingMatch);
@@ -949,6 +1014,115 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 				turnOffConstrains, isBestInlier);
 	}
 
+	// UNCERTAINTY
+	if (transformationFound == true
+			&& programParameters.transformationUncertainty > 0) {
+		int numPoints = 0;
+		for (int i = 0, k = 0; i < matches.size(); i++) {
+			if (isBestInlier[i] == true) {
+				numPoints++;
+			}
+		}
+
+		Eigen::MatrixXd setA(numPoints, 3), setB(numPoints, 3);
+		std::vector<Eigen::Matrix<double, 3, 3>> setAUncertainty,
+				setBUncertainty;
+		Eigen::Matrix3d infMat;
+
+		int ileBestInlierow = 0 ;
+		for (int i = 0, k = 0; i < matches.size(); i++) {
+			if (isBestInlier[i] == true) {
+				ileBestInlierow++;
+				int id = matches[i].first, id2 = matches[i].second;
+
+				if (matching) {
+					setA(k, 0) = firstFrame->matchingKeypoints3d[id](0);
+					setA(k, 1) = firstFrame->matchingKeypoints3d[id](1);
+					setA(k, 2) = firstFrame->matchingKeypoints3d[id](2);
+					setB(k, 0) = secondFrame->matchingKeypoints3d[id2](0);
+					setB(k, 1) = secondFrame->matchingKeypoints3d[id2](1);
+					setB(k, 2) = secondFrame->matchingKeypoints3d[id2](2);
+
+					infMat =
+							getInformationMatrix(keypoints[0][id].pt.x,
+									keypoints[0][id].pt.y,
+									firstFrame->matchingKeypoints3d[id](2)).cast<
+									double>();
+					setAUncertainty.push_back(infMat.inverse());
+
+					infMat = getInformationMatrix(keypoints[1][id2].pt.x,
+							keypoints[1][id2].pt.y,
+							secondFrame->matchingKeypoints3d[id2](2)).cast<
+							double>();
+					setBUncertainty.push_back(infMat.inverse());
+
+				} else {
+					setA(k, 0) = firstFrame->keypoints3d[id](0);
+					setA(k, 1) = firstFrame->keypoints3d[id](1);
+					setA(k, 2) = firstFrame->keypoints3d[id](2);
+					setB(k, 0) = secondFrame->keypoints3d[id2](0);
+					setB(k, 1) = secondFrame->keypoints3d[id2](1);
+					setB(k, 2) = secondFrame->keypoints3d[id2](2);
+
+					infMat = firstFrame->informationMatrix[id].cast<double>();
+					setAUncertainty.push_back(infMat.inverse());
+
+					infMat = secondFrame->informationMatrix[id2].cast<double>();
+					setBUncertainty.push_back(infMat.inverse());
+				}
+				k++;
+			}
+		}
+
+		std::cout << "Transformation: \n" << res
+						<< std::endl;
+
+		Eigen::Transform<double, 3, Eigen::Affine> kabschResult;
+		//	kabschResult.matrix() = res.cast<double>();
+		Eigen::Matrix4d resInverse = res.inverse().cast<double>();
+		kabschResult.matrix().block<3, 3>(0, 0) = resInverse.block<3, 3>(0, 0);
+		kabschResult.matrix().block<3, 1>(0, 3) = resInverse.block<3, 1>(0, 3);
+		transUncertainty = computeUncertainty(setA, setAUncertainty, setB,
+				setBUncertainty, kabschResult);
+//		transUncertainty = ConvertUncertaintyEuler2quat(transUncertainty,
+//				kabschResult);
+		std::cout << "transUncertainty: \n" << transUncertainty.inverse()
+				<< std::endl;
+
+		Eigen::Matrix<double, 6, 6> transInformation = transUncertainty.inverse();
+		if (std::isnan(transInformation(0, 0))) {
+			std::cout<<"BestInlierCount : " << ileBestInlierow << std::endl;
+
+			std::ofstream  set1, set2, niepew1, niepew2, kabschik;
+			set1.open("setA");
+			set1<<setA<<std::endl;
+			set1.close();
+
+			set2.open("setB");
+			set2<<setB<<std::endl;
+			set2.close();
+
+			niepew1.open("setAUncertainty");
+			for (int a =0; a < setAUncertainty.size(); a++)
+				niepew1<<setAUncertainty[a].row(0) << " | " << setAUncertainty[a].row(1) << " | " << setAUncertainty[a].row(2) <<std::endl;
+			niepew1.close();
+
+			niepew2.open("setBUncertainty");
+			for (int a =0; a < setBUncertainty.size(); a++)
+				niepew2<<setBUncertainty[a].row(0) << " | " << setBUncertainty[a].row(1) << " | " << setBUncertainty[a].row(2) <<std::endl;
+			niepew2.close();
+
+			kabschik.open("kabschResult");
+			kabschik << kabschResult.matrix();
+			kabschik.close();
+
+
+			int a;
+			std::cin >> a;
+		}
+	}
+	else
+		transUncertainty = Eigen::Matrix<double, 6, 6>::Identity();
 
 	if (transformationFound == true && programParameters.g2o_vs_sba == true) {
 		std::ofstream zapis;
@@ -1013,7 +1187,6 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 //							<< secondFrame->matchingKeypoints3d.size() << " "
 //							<< std::endl;
 
-
 					zapis << firstFrame->keypointsId[id] << " "
 							<< firstFrame->keypoints[id].x << " "
 							<< firstFrame->keypoints[id].y << " "
@@ -1048,106 +1221,680 @@ bool Track::estimateTransformation(kabschVertex *firstFrame,
 		zapis.close();
 	}
 
-
-
-
-if (programParameters.verbose != 0) {
-	std::cout << "Transformation found: " << transformationFound << std::endl;
-}
+	if (programParameters.verbose != 0) {
+		std::cout << "Transformation found: " << transformationFound
+				<< std::endl;
+	}
 //	if (matching == true)
 //	{
 //		wasInlierFirst.clear();
 //		wasInlierSecond.clear();
 //	}
 
-return transformationFound;
+	return transformationFound;
 }
 
 void Track::createVertex(ProgramParameters programParameters,
-	CalibrationParameters calibrationParams, double depthInvScale,
-	long int frameId, cv::Mat image) {
+		CalibrationParameters calibrationParams, double depthInvScale,
+		long int frameId, cv::Mat image) {
 //		std::cout << "Starting subpixel detection" << std::endl;
 //		cv::Mat grayImg;
 //		cvtColor(frameBGR[0], grayImg, CV_RGB2GRAY);
 //		cornerSubPix(grayImg, points[0], cvSize(7, 7), cvSize(-1, -1),
 //				cvTermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 4, 0.01));
 
-float data[5] = { calibrationParams.k1, calibrationParams.k2,
-		calibrationParams.p1, calibrationParams.p2, calibrationParams.k3 };
-calibrationParams.distCoeffs = cv::Mat(1, 5, CV_32FC1, &data);
-float cm[3][3] = { { calibrationParams.fu, 0, calibrationParams.u0 }, { 0,
-		calibrationParams.fv, calibrationParams.v0 }, { 0, 0, 1 } };
-calibrationParams.cameraMatrix = cv::Mat(3, 3, CV_32FC1, &cm);
+	float data[5] = { calibrationParams.k1, calibrationParams.k2,
+			calibrationParams.p1, calibrationParams.p2, calibrationParams.k3 };
+	calibrationParams.distCoeffs = cv::Mat(1, 5, CV_32FC1, &data);
+	float cm[3][3] = { { calibrationParams.fu, 0, calibrationParams.u0 }, { 0,
+			calibrationParams.fv, calibrationParams.v0 }, { 0, 0, 1 } };
+	calibrationParams.cameraMatrix = cv::Mat(3, 3, CV_32FC1, &cm);
 
-kabschVertex kbVertex;
+	kabschVertex kbVertex;
 //kbVertex.vertexId = vertexCounter;
-kbVertex.vertexId = frameId;
-kbVertex.imageRGB = image.clone();
-kbVertex.imageD = frameD[2].clone();
-int ii = 0;
-std::vector<cv::Point2f>::iterator it = points[1].begin();
-std::vector<int>::iterator itDepth = pointDepth.begin(), itID =
-		pointsID.begin();
-for (std::vector<cv::Point2f>::iterator it = points[1].begin();
-		it != points[1].end(); ii++) {
+	kbVertex.vertexId = frameId;
+	kbVertex.imageRGB = image.clone();
+	kbVertex.imageD = frameD[2].clone();
+
+	if (points[1].size() > 0) {
+		cv::Mat grayImg;
+		cvtColor(image, grayImg, CV_RGB2GRAY);
+		cornerSubPix(grayImg, points[1], cvSize(7, 7), cvSize(-1, -1),
+				cvTermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 4, 0.01));
+	}
+
+	int ii = 0;
+	std::vector<cv::Point2f>::iterator it = points[1].begin();
+	std::vector<double>::iterator itDepth = pointDepth.begin();
+	std::vector<int>::iterator itID = pointsID.begin();
+	for (std::vector<cv::Point2f>::iterator it = points[1].begin();
+			it != points[1].end(); ii++) {
 
 //	double Z = double(frameD[2].at<uint16_t>(roundY(it->y), roundX(it->x)))
 //			/ depthInvScale;
-	double Z = double(frameD[2].at<uint16_t>(roundSize(it->y, frameD[2].rows), roundSize(it->x, frameD[2].cols)))
-				/ depthInvScale;
+		double Z = double(
+				frameD[2].at<uint16_t>(roundSize(it->y, frameD[2].rows),
+						roundSize(it->x, frameD[2].cols))) / depthInvScale;
 
-	if (abs(Z) > 0.001) {
-		kbVertex.keypointsId.push_back(*itID);
-		kbVertex.keypoints.push_back(*it);
-		kbVertex.keypoints3d.push_back(
-				RGBDclass::point2Dto3D(*it, Z, calibrationParams.cameraMatrix,
-						calibrationParams.distCoeffs));
-		kbVertex.informationMatrix.push_back(
-				getInformationMatrix(it->x, it->y, Z));
-		++it, ++itDepth, ++itID;
-	} else {
+		if (abs(Z) > 0.001) {
+			kbVertex.keypointsId.push_back(*itID);
+			kbVertex.keypoints.push_back(*it);
+			kbVertex.keypoints3d.push_back(
+					RGBDclass::point2Dto3D(*it, Z,
+							calibrationParams.cameraMatrix,
+							calibrationParams.distCoeffs));
+			kbVertex.informationMatrix.push_back(
+					getInformationMatrix(it->x, it->y, Z));
+			*itDepth = Z;
+			++it, ++itDepth, ++itID;
+		} else {
 //			++it, ++itDepth, ++itID;
-		it = points[1].erase(it);
-		itDepth = pointDepth.erase(itDepth);
-		itID = pointsID.erase(itID);
+			it = points[1].erase(it);
+			itDepth = pointDepth.erase(itDepth);
+			itID = pointsID.erase(itID);
 
+		}
 	}
-}
-kbVertex.inGraph.resize(kbVertex.keypoints.size());
+	kbVertex.inGraph.resize(kbVertex.keypoints.size());
 
-vertexHistory.push_back(kbVertex);
-if (vertexHistory.size() > programParameters.historySize) {
-	vertexHistory.erase(vertexHistory.begin());
-}
+	vertexHistory.push_back(kbVertex);
+	if (vertexHistory.size() > programParameters.historySize) {
+		vertexHistory.erase(vertexHistory.begin());
+	}
 
-wasInlierSecond.clear();
-wasInlierSecond.resize(kbVertex.keypoints.size(), 0);
+	wasInlierSecond.clear();
+	wasInlierSecond.resize(kbVertex.keypoints.size(), 0);
 }
 
 Eigen::Matrix3f Track::getInformationMatrix(double u, double v, double z) {
 
-double varU = 1.1046, varV = 0.64160;
-double distVarCoefs[4] = { -8.9997e-06, 3.069e-003, 3.6512e-006, -0.0017512e-3 };
-Eigen::Matrix3f Ruvd, J, cov;
+	double varU = 1.1046, varV = 0.64160;
+	double distVarCoefs[4] = { -8.9997e-06, 3.069e-003, 3.6512e-006,
+			-0.0017512e-3 };
+	Eigen::Matrix3f Ruvd, J, cov;
 
-Ruvd << varU, 0, 0, 0, varV, 0, 0, 0, 0;
+	Ruvd << varU, 0, 0, 0, varV, 0, 0, 0, 0;
 
-J << 0.0017 * z, 0, (0.0017 * u - 0.549), 0, 0.0017 * z, (0.0017 * v - 0.443), 0, 0, 1;
-Ruvd(2, 2) = (distVarCoefs[0] * pow(z, 3.0) + distVarCoefs[1] * pow(z, 2.0)
-		+ distVarCoefs[2] * z + distVarCoefs[3]) / 3.0;
-cov = J * Ruvd * J.transpose();
+	J << 0.0017 * z, 0, (0.0017 * u - 0.549), 0, 0.0017 * z, (0.0017 * v - 0.443), 0, 0, 1;
+	Ruvd(2, 2) = (distVarCoefs[0] * pow(z, 3.0) + distVarCoefs[1] * pow(z, 2.0)
+			+ distVarCoefs[2] * z + distVarCoefs[3]) / 3.0;
+	cov = J * Ruvd * J.transpose();
 
-return cov.inverse();
+	return cov.inverse();
 }
 
 int Track::computeRANSACIterationCount(double successRate, double inlierRate,
-	int numberOfPairs) {
-return (log(1 - successRate) / log(1 - pow(inlierRate, numberOfPairs)));
+		int numberOfPairs) {
+	return (log(1 - successRate) / log(1 - pow(inlierRate, numberOfPairs)));
 }
 
 double Track::matrixError(Eigen::Matrix4f x, Eigen::Matrix4f y) {
 // Euclidean distance
-return pow(x(0, 3) - y(0, 3), 2) + pow(x(1, 3) - y(1, 3), 2)
-		+ pow(x(2, 3) - y(2, 3), 2);
+	return pow(x(0, 3) - y(0, 3), 2) + pow(x(1, 3) - y(1, 3), 2)
+			+ pow(x(2, 3) - y(2, 3), 2);
 //return (x-y).operatorNorm();
+}
+
+Eigen::Matrix<double, 6, 6> Track::computeUncertainty(
+		const Eigen::MatrixXd& setA,
+		std::vector<Eigen::Matrix<double, 3, 3>>& setAUncertainty,
+		const Eigen::MatrixXd& setB,
+		std::vector<Eigen::Matrix<double, 3, 3>>& setBUncertainty,
+		Eigen::Transform<double, 3, Eigen::Affine>& transformation) {
+
+	Eigen::Matrix<double, 6, 6> dgdTheta;
+	dgdTheta.setZero();
+
+	Eigen::Quaternion<double> quat(transformation.rotation());
+	double x = transformation.matrix()(0, 3);
+	double y = transformation.matrix()(1, 3);
+	double z = transformation.matrix()(2, 3);
+
+	Eigen::MatrixXd Cx(2 * 3 * setA.rows(), 2 * 3 * setA.rows());
+	Cx = Eigen::ArrayXXd::Zero(2 * 3 * setA.rows(), 2 * 3 * setA.rows());
+	Eigen::MatrixXd dgdX(2 * 3 * setA.rows(), 6);
+	double k = 1.0 / setA.rows();
+	double qx = quat.x();
+	double qy = quat.y();
+	double qz = quat.z();
+	double qw = quat.w();
+	for (size_t i = 0; i < setA.rows(); i++) {
+		double xa = setA(i, 0);
+		double ya = setA(i, 1);
+		double za = setA(i, 2);
+		double xb = setB(i, 0);
+		double yb = setB(i, 1);
+		double zb = setB(i, 2);
+
+		dgdTheta(0, 0) += 2.0;
+		dgdTheta(0, 1) += 0.0;
+		dgdTheta(0, 2) += 0.0;
+		dgdTheta(0, 3) += (4.0) * qy * yb + (4.0) * qz * zb;
+		dgdTheta(0, 4) += (4.0) * qw * zb + (4.0) * yb * qx - (8.0) * qy * xb;
+		dgdTheta(0, 5) += -(8.0) * xb * qz + (4.0) * qx * zb - (4.0) * yb * qw;
+
+		dgdTheta(1, 0) += 0.0;
+		dgdTheta(1, 1) += 2.0;
+		dgdTheta(1, 2) += 0.0;
+		dgdTheta(1, 3) += -(4.0) * qw * zb - (8.0) * yb * qx + (4.0) * qy * xb;
+		dgdTheta(1, 4) += (4.0) * qx * xb + (4.0) * qz * zb;
+		dgdTheta(1, 5) += (4.0) * qy * zb + (4.0) * qw * xb - (8.0) * yb * qz;
+
+		dgdTheta(2, 0) += 0.0;
+		dgdTheta(2, 1) += 0.0;
+		dgdTheta(2, 2) += 2.0;
+		dgdTheta(2, 3) += (4.0) * xb * qz - (8.0) * qx * zb + (4.0) * yb * qw;
+		dgdTheta(2, 4) += -(8.0) * qy * zb - (4.0) * qw * xb + (4.0) * yb * qz;
+		dgdTheta(2, 5) += (4.0) * qx * xb + (4.0) * qy * yb;
+
+		dgdTheta(3, 0) += (4.0) * qy * yb + (4.0) * qz * zb;
+		dgdTheta(3, 1) += -(4.0) * qw * zb - (8.0) * yb * qx + (4.0) * qy * xb;
+		dgdTheta(3, 2) += (4.0) * xb * qz - (8.0) * qx * zb + (4.0) * yb * qw;
+		dgdTheta(3, 3) += -(8.0)
+				* ((1.0 - (2.0) * pow(qx, 2.0) - (2.0) * pow(qy, 2.0)) * zb - za
+						+ z + yb * ((2.0) * qy * qz + (2.0) * qw * qx)
+						+ (-(2.0) * qy * qw + (2.0) * qx * qz) * xb) * zb
+				- (8.0) * yb
+						* (xb * ((2.0) * qw * qz + (2.0) * qy * qx) - ya
+								+ ((2.0) * qy * qz - (2.0) * qw * qx) * zb + y
+								+ yb
+										* (1.0 - (2.0) * pow(qz, 2.0)
+												- (2.0) * pow(qx, 2.0)))
+				- (2.0) * (-(2.0) * xb * qz + (4.0) * qx * zb - (2.0) * yb * qw)
+						* ((2.0) * xb * qz - (4.0) * qx * zb + (2.0) * yb * qw)
+				- (2.0) * ((2.0) * qw * zb + (4.0) * yb * qx - (2.0) * qy * xb)
+						* (-(2.0) * qw * zb - (4.0) * yb * qx + (2.0) * qy * xb)
+				- (2.0) * ((2.0) * qy * yb + (2.0) * qz * zb)
+						* (-(2.0) * qy * yb - (2.0) * qz * zb);
+		dgdTheta(3, 4) += -(2.0)
+				* ((4.0) * qy * zb + (2.0) * qw * xb - (2.0) * yb * qz)
+				* ((2.0) * xb * qz - (4.0) * qx * zb + (2.0) * yb * qw)
+				+ (4.0)
+						* (xb * ((2.0) * qw * qz + (2.0) * qy * qx) - ya
+								+ ((2.0) * qy * qz - (2.0) * qw * qx) * zb + y
+								+ yb
+										* (1.0 - (2.0) * pow(qz, 2.0)
+												- (2.0) * pow(qx, 2.0))) * xb
+				- (2.0) * ((2.0) * qy * yb + (2.0) * qz * zb)
+						* (-(2.0) * qw * zb - (2.0) * yb * qx + (4.0) * qy * xb)
+				- (2.0) * (-(2.0) * qx * xb - (2.0) * qz * zb)
+						* (-(2.0) * qw * zb - (4.0) * yb * qx + (2.0) * qy * xb)
+				+ (4.0) * yb
+						* ((1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qy, 2.0))
+								* xb + yb * (-(2.0) * qw * qz + (2.0) * qy * qx)
+								+ ((2.0) * qy * qw + (2.0) * qx * qz) * zb - xa
+								+ x);
+		dgdTheta(3, 5) += -(2.0)
+				* ((2.0) * xb * qz - (4.0) * qx * zb + (2.0) * yb * qw)
+				* (-(2.0) * qx * xb - (2.0) * qy * yb)
+				- (2.0) * (-(2.0) * qy * zb - (2.0) * qw * xb + (4.0) * yb * qz)
+						* (-(2.0) * qw * zb - (4.0) * yb * qx + (2.0) * qy * xb)
+				+ (4.0)
+						* ((1.0 - (2.0) * pow(qx, 2.0) - (2.0) * pow(qy, 2.0))
+								* zb - za + z
+								+ yb * ((2.0) * qy * qz + (2.0) * qw * qx)
+								+ (-(2.0) * qy * qw + (2.0) * qx * qz) * xb)
+						* xb
+				- (2.0) * ((4.0) * xb * qz - (2.0) * qx * zb + (2.0) * yb * qw)
+						* ((2.0) * qy * yb + (2.0) * qz * zb)
+				+ (4.0)
+						* ((1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qy, 2.0))
+								* xb + yb * (-(2.0) * qw * qz + (2.0) * qy * qx)
+								+ ((2.0) * qy * qw + (2.0) * qx * qz) * zb - xa
+								+ x) * zb;
+
+		dgdTheta(4, 0) += (4.0) * qw * zb + (4.0) * yb * qx - (8.0) * qy * xb;
+		dgdTheta(4, 1) += (4.0) * qx * xb + (4.0) * qz * zb;
+		dgdTheta(4, 2) += -(8.0) * qy * zb - (4.0) * qw * xb + (4.0) * yb * qz;
+		dgdTheta(4, 3) += (4.0)
+				* (xb * ((2.0) * qw * qz + (2.0) * qy * qx) - ya
+						+ ((2.0) * qy * qz - (2.0) * qw * qx) * zb + y
+						+ yb
+								* (1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qx, 2.0))) * xb
+				- (2.0) * (-(2.0) * xb * qz + (4.0) * qx * zb - (2.0) * yb * qw)
+						* (-(4.0) * qy * zb - (2.0) * qw * xb + (2.0) * yb * qz)
+				- (2.0) * ((2.0) * qw * zb + (2.0) * yb * qx - (4.0) * qy * xb)
+						* (-(2.0) * qy * yb - (2.0) * qz * zb)
+				+ (4.0) * yb
+						* ((1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qy, 2.0))
+								* xb + yb * (-(2.0) * qw * qz + (2.0) * qy * qx)
+								+ ((2.0) * qy * qw + (2.0) * qx * qz) * zb - xa
+								+ x)
+				- (2.0) * ((2.0) * qw * zb + (4.0) * yb * qx - (2.0) * qy * xb)
+						* ((2.0) * qx * xb + (2.0) * qz * zb);
+		dgdTheta(4, 4) +=
+				-(2.0) * (-(2.0) * qx * xb - (2.0) * qz * zb)
+						* ((2.0) * qx * xb + (2.0) * qz * zb)
+						- (8.0)
+								* ((1.0 - (2.0) * pow(qx, 2.0)
+										- (2.0) * pow(qy, 2.0)) * zb - za + z
+										+ yb
+												* ((2.0) * qy * qz
+														+ (2.0) * qw * qx)
+										+ (-(2.0) * qy * qw + (2.0) * qx * qz)
+												* xb) * zb
+						- (8.0)
+								* ((1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qy, 2.0)) * xb
+										+ yb
+												* (-(2.0) * qw * qz
+														+ (2.0) * qy * qx)
+										+ ((2.0) * qy * qw + (2.0) * qx * qz)
+												* zb - xa + x) * xb
+						- (2.0)
+								* ((2.0) * qw * zb + (2.0) * yb * qx
+										- (4.0) * qy * xb)
+								* (-(2.0) * qw * zb - (2.0) * yb * qx
+										+ (4.0) * qy * xb)
+						- (2.0)
+								* ((4.0) * qy * zb + (2.0) * qw * xb
+										- (2.0) * yb * qz)
+								* (-(4.0) * qy * zb - (2.0) * qw * xb
+										+ (2.0) * yb * qz);
+		dgdTheta(4, 5) += -(2.0)
+				* (-(2.0) * qy * zb - (2.0) * qw * xb + (4.0) * yb * qz)
+				* ((2.0) * qx * xb + (2.0) * qz * zb)
+				- (2.0) * ((4.0) * xb * qz - (2.0) * qx * zb + (2.0) * yb * qw)
+						* ((2.0) * qw * zb + (2.0) * yb * qx - (4.0) * qy * xb)
+				+ (4.0)
+						* (xb * ((2.0) * qw * qz + (2.0) * qy * qx) - ya
+								+ ((2.0) * qy * qz - (2.0) * qw * qx) * zb + y
+								+ yb
+										* (1.0 - (2.0) * pow(qz, 2.0)
+												- (2.0) * pow(qx, 2.0))) * zb
+				+ (4.0) * yb
+						* ((1.0 - (2.0) * pow(qx, 2.0) - (2.0) * pow(qy, 2.0))
+								* zb - za + z
+								+ yb * ((2.0) * qy * qz + (2.0) * qw * qx)
+								+ (-(2.0) * qy * qw + (2.0) * qx * qz) * xb)
+				- (2.0) * (-(4.0) * qy * zb - (2.0) * qw * xb + (2.0) * yb * qz)
+						* (-(2.0) * qx * xb - (2.0) * qy * yb);
+
+		dgdTheta(5, 0) += -(8.0) * xb * qz + (4.0) * qx * zb - (4.0) * yb * qw;
+		dgdTheta(5, 1) += (4.0) * qy * zb + (4.0) * qw * xb - (8.0) * yb * qz;
+		dgdTheta(5, 2) += (4.0) * qx * xb + (4.0) * qy * yb;
+		dgdTheta(5, 3) += -(2.0)
+				* (-(4.0) * xb * qz + (2.0) * qx * zb - (2.0) * yb * qw)
+				* (-(2.0) * qy * yb - (2.0) * qz * zb)
+				+ (4.0)
+						* ((1.0 - (2.0) * pow(qx, 2.0) - (2.0) * pow(qy, 2.0))
+								* zb - za + z
+								+ yb * ((2.0) * qy * qz + (2.0) * qw * qx)
+								+ (-(2.0) * qy * qw + (2.0) * qx * qz) * xb)
+						* xb
+				- (2.0) * ((2.0) * qx * xb + (2.0) * qy * yb)
+						* (-(2.0) * xb * qz + (4.0) * qx * zb - (2.0) * yb * qw)
+				- (2.0) * ((2.0) * qy * zb + (2.0) * qw * xb - (4.0) * yb * qz)
+						* ((2.0) * qw * zb + (4.0) * yb * qx - (2.0) * qy * xb)
+				+ (4.0)
+						* ((1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qy, 2.0))
+								* xb + yb * (-(2.0) * qw * qz + (2.0) * qy * qx)
+								+ ((2.0) * qy * qw + (2.0) * qx * qz) * zb - xa
+								+ x) * zb;
+		dgdTheta(5, 4) +=
+				-(2.0) * ((4.0) * qy * zb + (2.0) * qw * xb - (2.0) * yb * qz)
+						* ((2.0) * qx * xb + (2.0) * qy * yb)
+						- (2.0)
+								* ((2.0) * qy * zb + (2.0) * qw * xb
+										- (4.0) * yb * qz)
+								* (-(2.0) * qx * xb - (2.0) * qz * zb)
+						+ (4.0)
+								* (xb * ((2.0) * qw * qz + (2.0) * qy * qx) - ya
+										+ ((2.0) * qy * qz - (2.0) * qw * qx)
+												* zb + y
+										+ yb
+												* (1.0 - (2.0) * pow(qz, 2.0)
+														- (2.0) * pow(qx, 2.0)))
+								* zb
+						+ (4.0) * yb
+								* ((1.0 - (2.0) * pow(qx, 2.0)
+										- (2.0) * pow(qy, 2.0)) * zb - za + z
+										+ yb
+												* ((2.0) * qy * qz
+														+ (2.0) * qw * qx)
+										+ (-(2.0) * qy * qw + (2.0) * qx * qz)
+												* xb)
+						- (2.0)
+								* (-(4.0) * xb * qz + (2.0) * qx * zb
+										- (2.0) * yb * qw)
+								* (-(2.0) * qw * zb - (2.0) * yb * qx
+										+ (4.0) * qy * xb);
+		dgdTheta(5, 5) +=
+				-(2.0) * ((4.0) * xb * qz - (2.0) * qx * zb + (2.0) * yb * qw)
+						* (-(4.0) * xb * qz + (2.0) * qx * zb - (2.0) * yb * qw)
+						- (8.0) * yb
+								* (xb * ((2.0) * qw * qz + (2.0) * qy * qx) - ya
+										+ ((2.0) * qy * qz - (2.0) * qw * qx)
+												* zb + y
+										+ yb
+												* (1.0 - (2.0) * pow(qz, 2.0)
+														- (2.0) * pow(qx, 2.0)))
+						- (8.0)
+								* ((1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qy, 2.0)) * xb
+										+ yb
+												* (-(2.0) * qw * qz
+														+ (2.0) * qy * qx)
+										+ ((2.0) * qy * qw + (2.0) * qx * qz)
+												* zb - xa + x) * xb
+						- (2.0) * ((2.0) * qx * xb + (2.0) * qy * yb)
+								* (-(2.0) * qx * xb - (2.0) * qy * yb)
+						- (2.0)
+								* ((2.0) * qy * zb + (2.0) * qw * xb
+										- (4.0) * yb * qz)
+								* (-(2.0) * qy * zb - (2.0) * qw * xb
+										+ (4.0) * yb * qz);
+
+		Cx.block<3, 3>(i * 3, i * 3) = setAUncertainty[i];
+		Cx.block<3, 3>(setA.rows() * 3 + i * 3, setA.rows() * 3 + i * 3) =
+				setBUncertainty[i];
+
+		dgdX(i * 3, 0) = -2.0;
+		dgdX(i * 3, 1) = 0.0;
+		dgdX(i * 3, 2) = 0.0;
+		dgdX(i * 3, 3) = -(4.0) * qy * yb - (4.0) * qz * zb;
+		dgdX(i * 3, 4) = -(4.0) * qx * yb - (4.0) * qw * zb + (8.0) * xb * qy;
+		dgdX(i * 3, 5) = (4.0) * qw * yb + (8.0) * xb * qz - (4.0) * qx * zb;
+
+		dgdX(i * 3 + 1, 0) = 0.0;
+		dgdX(i * 3 + 1, 1) = -2.0;
+		dgdX(i * 3 + 1, 2) = 0.0;
+		dgdX(i * 3 + 1, 3) = (8.0) * qx * yb + (4.0) * qw * zb
+				- (4.0) * xb * qy;
+		dgdX(i * 3 + 1, 4) = -(4.0) * qx * xb - (4.0) * qz * zb;
+		dgdX(i * 3 + 1, 5) = (8.0) * qz * yb - (4.0) * zb * qy
+				- (4.0) * qw * xb;
+
+		dgdX(i * 3 + 2, 0) = 0.0;
+		dgdX(i * 3 + 2, 1) = 0.0;
+		dgdX(i * 3 + 2, 2) = -2.0;
+		dgdX(i * 3 + 2, 3) = -(4.0) * qw * yb - (4.0) * xb * qz
+				+ (8.0) * qx * zb;
+		dgdX(i * 3 + 2, 4) = -(4.0) * qz * yb + (8.0) * zb * qy
+				+ (4.0) * qw * xb;
+		dgdX(i * 3 + 2, 5) = -(4.0) * qx * xb - (4.0) * qy * yb;
+
+		dgdX(setA.rows() * 3 + i * 3, 0) = 2.0 - (4.0) * pow(qy, 2.0)
+				- (4.0) * pow(qz, 2.0);
+		dgdX(setA.rows() * 3 + i * 3, 1) = (4.0) * qx * qy + (4.0) * qw * qz;
+		dgdX(setA.rows() * 3 + i * 3, 2) = (4.0) * qx * qz - (4.0) * qw * qy;
+		dgdX(setA.rows() * 3 + i * 3, 3) = (4.0)
+				* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+						+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+						+ (1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qx, 2.0))
+								* yb) * qy
+				- (2.0) * (1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+						* (-(2.0) * qy * yb - (2.0) * qz * zb)
+				- (2.0) * ((4.0) * qx * yb + (2.0) * qw * zb - (2.0) * xb * qy)
+						* ((2.0) * qx * qy + (2.0) * qw * qz)
+				- (2.0) * (-(2.0) * qw * yb - (2.0) * xb * qz + (4.0) * qx * zb)
+						* ((2.0) * qx * qz - (2.0) * qw * qy)
+				+ (4.0)
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb) * qz;
+		dgdX(setA.rows() * 3 + i * 3, 4) = -(2.0)
+				* ((2.0) * qx * qz - (2.0) * qw * qy)
+				* (-(2.0) * qz * yb + (4.0) * zb * qy + (2.0) * qw * xb)
+				- (4.0) * qw
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb)
+				- (2.0) * (1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+						* (-(2.0) * qx * yb - (2.0) * qw * zb + (4.0) * xb * qy)
+				- (2.0) * (-(2.0) * qx * xb - (2.0) * qz * zb)
+						* ((2.0) * qx * qy + (2.0) * qw * qz)
+				+ (4.0)
+						* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+								+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+								+ (1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qx, 2.0)) * yb) * qx
+				- (8.0)
+						* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+								* xb - xa
+								+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+								+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb)
+						* qy;
+		dgdX(setA.rows() * 3 + i * 3, 5) = (4.0) * qw
+				* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+						+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+						+ (1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qx, 2.0))
+								* yb)
+				- (2.0) * ((2.0) * qx * qz - (2.0) * qw * qy)
+						* (-(2.0) * qx * xb - (2.0) * qy * yb)
+				- (8.0) * qz
+						* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+								* xb - xa
+								+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+								+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb)
+				+ (4.0)
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb) * qx
+				- (2.0) * (1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+						* ((2.0) * qw * yb + (4.0) * xb * qz - (2.0) * qx * zb)
+				- (2.0) * ((2.0) * qx * qy + (2.0) * qw * qz)
+						* ((4.0) * qz * yb - (2.0) * zb * qy - (2.0) * qw * xb);
+
+		dgdX(setA.rows() * 3 + i * 3 + 1, 0) = (4.0) * qx * qy
+				- (4.0) * qw * qz;
+		dgdX(setA.rows() * 3 + i * 3 + 1, 1) = 2.0 - (4.0) * pow(qz, 2.0)
+				- (4.0) * pow(qx, 2.0);
+		dgdX(setA.rows() * 3 + i * 3 + 1, 2) = (4.0) * qw * qx
+				+ (4.0) * qz * qy;
+		dgdX(setA.rows() * 3 + i * 3 + 1, 3) =
+				-(2.0) * (-(2.0) * qy * yb - (2.0) * qz * zb)
+						* ((2.0) * qx * qy - (2.0) * qw * qz)
+						- (2.0)
+								* (1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qx, 2.0))
+								* ((4.0) * qx * yb + (2.0) * qw * zb
+										- (2.0) * xb * qy)
+						+ (4.0) * qw
+								* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+										+ xb
+												* ((2.0) * qx * qz
+														- (2.0) * qw * qy) + z
+										+ (1.0 - (2.0) * pow(qy, 2.0)
+												- (2.0) * pow(qx, 2.0)) * zb)
+						- (8.0)
+								* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya
+										+ y
+										+ zb
+												* (-(2.0) * qw * qx
+														+ (2.0) * qz * qy)
+										+ (1.0 - (2.0) * pow(qz, 2.0)
+												- (2.0) * pow(qx, 2.0)) * yb)
+								* qx
+						+ (4.0)
+								* ((1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qz, 2.0)) * xb - xa
+										+ ((2.0) * qx * qz + (2.0) * qw * qy)
+												* zb + x
+										+ ((2.0) * qx * qy - (2.0) * qw * qz)
+												* yb) * qy
+						- (2.0) * ((2.0) * qw * qx + (2.0) * qz * qy)
+								* (-(2.0) * qw * yb - (2.0) * xb * qz
+										+ (4.0) * qx * zb);
+		dgdX(setA.rows() * 3 + i * 3 + 1, 4) = (4.0) * qx
+				* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0)) * xb - xa
+						+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+						+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb)
+				- (2.0) * (-(2.0) * qx * yb - (2.0) * qw * zb + (4.0) * xb * qy)
+						* ((2.0) * qx * qy - (2.0) * qw * qz)
+				- (2.0) * ((2.0) * qw * qx + (2.0) * qz * qy)
+						* (-(2.0) * qz * yb + (4.0) * zb * qy + (2.0) * qw * xb)
+				- (2.0) * (1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qx, 2.0))
+						* (-(2.0) * qx * xb - (2.0) * qz * zb)
+				+ (4.0)
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb) * qz;
+		dgdX(setA.rows() * 3 + i * 3 + 1, 5) = -(8.0)
+				* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+						+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+						+ (1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qx, 2.0))
+								* yb) * qz
+				+ (4.0)
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb) * qy
+				- (2.0) * ((2.0) * qw * qx + (2.0) * qz * qy)
+						* (-(2.0) * qx * xb - (2.0) * qy * yb)
+				- (2.0) * ((2.0) * qx * qy - (2.0) * qw * qz)
+						* ((2.0) * qw * yb + (4.0) * xb * qz - (2.0) * qx * zb)
+				- (4.0) * qw
+						* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+								* xb - xa
+								+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+								+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb)
+				- (2.0) * (1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qx, 2.0))
+						* ((4.0) * qz * yb - (2.0) * zb * qy - (2.0) * qw * xb);
+
+		dgdX(setA.rows() * 3 + i * 3 + 2, 0) = (4.0) * qx * qz
+				+ (4.0) * qw * qy;
+		dgdX(setA.rows() * 3 + i * 3 + 2, 1) = -(4.0) * qw * qx
+				+ (4.0) * qz * qy;
+		dgdX(setA.rows() * 3 + i * 3 + 2, 2) = 2.0 - (4.0) * pow(qy, 2.0)
+				- (4.0) * pow(qx, 2.0);
+		dgdX(setA.rows() * 3 + i * 3 + 2, 3) = -(4.0) * qw
+				* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+						+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+						+ (1.0 - (2.0) * pow(qz, 2.0) - (2.0) * pow(qx, 2.0))
+								* yb)
+				- (2.0) * ((4.0) * qx * yb + (2.0) * qw * zb - (2.0) * xb * qy)
+						* (-(2.0) * qw * qx + (2.0) * qz * qy)
+				- (2.0) * (1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qx, 2.0))
+						* (-(2.0) * qw * yb - (2.0) * xb * qz + (4.0) * qx * zb)
+				+ (4.0) * qz
+						* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+								* xb - xa
+								+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+								+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb)
+				- (2.0) * ((2.0) * qx * qz + (2.0) * qw * qy)
+						* (-(2.0) * qy * yb - (2.0) * qz * zb)
+				- (8.0)
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb) * qx;
+		dgdX(setA.rows() * 3 + i * 3 + 2, 4) = -(2.0)
+				* (-(2.0) * qx * xb - (2.0) * qz * zb)
+				* (-(2.0) * qw * qx + (2.0) * qz * qy)
+				+ (4.0)
+						* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+								+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+								+ (1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qx, 2.0)) * yb) * qz
+				- (2.0) * (1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qx, 2.0))
+						* (-(2.0) * qz * yb + (4.0) * zb * qy + (2.0) * qw * xb)
+				- (2.0) * ((2.0) * qx * qz + (2.0) * qw * qy)
+						* (-(2.0) * qx * yb - (2.0) * qw * zb + (4.0) * xb * qy)
+				- (8.0)
+						* (((2.0) * qw * qx + (2.0) * qz * qy) * yb - za
+								+ xb * ((2.0) * qx * qz - (2.0) * qw * qy) + z
+								+ (1.0 - (2.0) * pow(qy, 2.0)
+										- (2.0) * pow(qx, 2.0)) * zb) * qy
+				+ (4.0) * qw
+						* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0))
+								* xb - xa
+								+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+								+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb);
+		dgdX(setA.rows() * 3 + i * 3 + 2, 5) = (4.0) * qx
+				* ((1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qz, 2.0)) * xb - xa
+						+ ((2.0) * qx * qz + (2.0) * qw * qy) * zb + x
+						+ ((2.0) * qx * qy - (2.0) * qw * qz) * yb)
+				- (2.0) * ((2.0) * qx * qz + (2.0) * qw * qy)
+						* ((2.0) * qw * yb + (4.0) * xb * qz - (2.0) * qx * zb)
+				- (2.0) * (1.0 - (2.0) * pow(qy, 2.0) - (2.0) * pow(qx, 2.0))
+						* (-(2.0) * qx * xb - (2.0) * qy * yb)
+				+ (4.0)
+						* (xb * ((2.0) * qx * qy + (2.0) * qw * qz) - ya + y
+								+ zb * (-(2.0) * qw * qx + (2.0) * qz * qy)
+								+ (1.0 - (2.0) * pow(qz, 2.0)
+										- (2.0) * pow(qx, 2.0)) * yb) * qy
+				- (2.0) * (-(2.0) * qw * qx + (2.0) * qz * qy)
+						* ((4.0) * qz * yb - (2.0) * zb * qy - (2.0) * qw * xb);
+	}
+	dgdX = k * dgdX;
+	dgdTheta = k * dgdTheta;
+	Eigen::Matrix<double, 6, 6> dgdThetaInv = dgdTheta.inverse();
+
+	//std::cout << "Cx: \n" << Cx << "\n";
+	//std::cout << "dgdX: \n" << dgdX << "\n";
+	//std::cout << "dgdTheta: \n" << dgdTheta << "\n";
+	return dgdThetaInv * dgdX.transpose() * Cx * dgdX * dgdThetaInv;
+	//uncertainty = ConvertUncertaintyEuler2quat(uncertainty, transformation);
+}
+
+Eigen::Matrix<double, 6, 6> Track::ConvertUncertaintyEuler2quat(
+		const Eigen::Matrix<double, 6, 6>& _uncertainty,
+		const Eigen::Transform<double, 3, Eigen::Affine>& transformation) {
+	double fi = atan2(transformation.matrix()(1, 0),
+			transformation.matrix()(0, 0));
+	double psi = -asin(transformation.matrix()(2, 0));
+	double theta = atan2(transformation.matrix()(2, 1),
+			transformation.matrix()(2, 2));
+	double x = transformation.matrix()(0, 3);
+	double y = transformation.matrix()(1, 3);
+	double z = transformation.matrix()(2, 3);
+
+	Eigen::Matrix<double, 6, 6> J;
+	J(0, 0) = 0;
+	J(0, 1) = 0;
+	J(0, 2) = 0;
+	J(0, 3) = 1;
+	J(0, 4) = 0;
+	J(0, 5) = 0;
+	J(1, 0) = 0;
+	J(1, 1) = 0;
+	J(1, 2) = 0;
+	J(1, 3) = 0;
+	J(1, 4) = 1;
+	J(1, 5) = 0;
+	J(2, 0) = 0;
+	J(2, 1) = 0;
+	J(2, 2) = 0;
+	J(2, 3) = 0;
+	J(2, 4) = 0;
+	J(2, 5) = 1;
+
+	J(3, 3) = 0;
+	J(3, 4) = 0;
+	J(3, 5) = 0;
+	J(3, 0) = -(0.5) * sin((0.5) * fi) * cos((0.5) * psi) * sin((0.5) * theta)
+			- (0.5) * sin((0.5) * psi) * cos((0.5) * theta) * cos((0.5) * fi);
+	J(3, 1) = -(0.5) * cos((0.5) * theta) * sin((0.5) * fi) * cos((0.5) * psi)
+			- (0.5) * sin((0.5) * psi) * cos((0.5) * fi) * sin((0.5) * theta);
+	J(3, 2) = (0.5) * sin((0.5) * psi) * sin((0.5) * fi) * sin((0.5) * theta)
+			+ (0.5) * cos((0.5) * theta) * cos((0.5) * psi) * cos((0.5) * fi);
+
+	J(4, 0) = (0.5) * cos((0.5) * psi) * cos((0.5) * fi) * sin((0.5) * theta)
+			- (0.5) * sin((0.5) * psi) * cos((0.5) * theta) * sin((0.5) * fi);
+	J(4, 1) = -(0.5) * sin((0.5) * psi) * sin((0.5) * fi) * sin((0.5) * theta)
+			+ (0.5) * cos((0.5) * theta) * cos((0.5) * psi) * cos((0.5) * fi);
+	J(4, 2) = (0.5) * cos((0.5) * theta) * sin((0.5) * fi) * cos((0.5) * psi)
+			- (0.5) * sin((0.5) * psi) * cos((0.5) * fi) * sin((0.5) * theta);
+	J(4, 3) = 0;
+	J(4, 3) = 0;
+	J(4, 4) = 0;
+
+	J(5, 3) = 0;
+	J(5, 4) = 0;
+	J(5, 5) = 0;
+	J(5, 0) = (0.5) * sin((0.5) * psi) * sin((0.5) * fi) * sin((0.5) * theta)
+			+ (0.5) * cos((0.5) * theta) * cos((0.5) * psi) * cos((0.5) * fi);
+	J(5, 1) = -(0.5) * cos((0.5) * psi) * cos((0.5) * fi) * sin((0.5) * theta)
+			- (0.5) * sin((0.5) * psi) * cos((0.5) * theta) * sin((0.5) * fi);
+	J(5, 2) = -(0.5) * sin((0.5) * fi) * cos((0.5) * psi) * sin((0.5) * theta)
+			- (0.5) * sin((0.5) * psi) * cos((0.5) * theta) * cos((0.5) * fi);
+
+	Eigen::Matrix<double, 6, 6> uncertainty = J * _uncertainty * J.transpose();
+	return uncertainty;
 }

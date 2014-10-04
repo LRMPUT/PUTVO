@@ -51,7 +51,7 @@ for i in range(1,int(numberOfImages)+1):
 	# Converting depth images
 	if "living" in dataset:
 		call("./kinect 0 depth_%0.4d.depth" % (i) + " depth_%0.4d.png" % (i), shell=True);
-	else
+	else:
 		call("./kinect 1 depth_%0.4d.depth" % (i) + " depth_%0.4d.png" % (i), shell=True);
 	call("rm *.depth", shell=True);
 
@@ -64,5 +64,5 @@ for i in range(1,int(numberOfImages)+1):
 	p1 = subprocess.Popen("cat groundtruth.txt", stdout=subprocess.PIPE, shell=True);
 	p2 = subprocess.Popen("head -n " + str(i), stdin=p1.stdout, stdout=subprocess.PIPE, shell=True);
 	p3 = subprocess.Popen("tail -1", stdin=p2.stdout, stdout=subprocess.PIPE, shell=True);
-	p4 = subprocess.Popen("cut -d' ' -f 1 >> matchedIndices", stdin=p3.stdout, stdout=subprocess.PIPE, shell=True);
+	p4 = subprocess.Popen("cut -d' ' -f 1 >> matched", stdin=p3.stdout, stdout=subprocess.PIPE, shell=True);
 

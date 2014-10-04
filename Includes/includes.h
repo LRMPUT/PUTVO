@@ -92,6 +92,12 @@ struct ProgramParameters
 		
 	// DBScan eps		
 	double DBScanEps;
+
+	//
+	//	Quadtree
+	//
+	// Quadtree on/off
+	int Quadtree;
 	
 	//
 	// Transformation estimation
@@ -132,8 +138,14 @@ struct ProgramParameters
 	// Showing tracking
 	int showTracking;
 
+	// Using the uncertainty of Kabsch based on the uncertainty of features
+	int transformationUncertainty;
+
 	// g2o features
 	int g2oWithFeatures;
+
+	// g2o with features using TRACKXYZ
+	int g2oWithTRACKXYZ;
 
 	// g2o vs sba save file
 	int g2o_vs_sba;

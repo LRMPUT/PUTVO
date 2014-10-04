@@ -13,5 +13,5 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 
-add_executable (kinect Includes/functions.cpp DBscan/dbscan.cpp Show/Show.cpp TransformationEstimation/TransformationEstimation.cpp Track/track.cpp Filtry/Filtry.cpp RGBD/RGBDprocessing.cpp kinect.cpp  main.cpp )
+add_executable (kinect Includes/functions.cpp DBscan/dbscan.cpp Quadtree/lcg.cpp Quadtree/quadtree.cpp Show/Show.cpp TransformationEstimation/TransformationEstimation.cpp Track/track.cpp Filtry/Filtry.cpp RGBD/RGBDprocessing.cpp kinect.cpp  main.cpp )
 target_link_libraries (kinect ${PCL_LIBRARIES} ${OpenCV_LIBS})

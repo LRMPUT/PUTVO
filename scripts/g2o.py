@@ -5,7 +5,8 @@ import sys
 dataset=sys.argv[1];
 
 call("./../../PUTSLAM/3rdParty/g2o/bin/g2o -i 0 -solver gn_pcg -o ../results/g2o_out_0.g2o ../results/graphFile.g2o", shell=True); # removed "-v"
-call("./../../PUTSLAM/3rdParty/g2o/bin/g2o -i 70 -guess -solver gn_pcg -o ../results/g2o_out_70.g2o ../results/graphFile.g2o", shell=True);
+#call("./../../PUTSLAM/3rdParty/g2o/bin/g2o -i 70 -guess -solver gn_pcg -o ../results/g2o_out_70.g2o ../results/graphFile.g2o", shell=True);
+call("./../../PUTSLAM/3rdParty/g2o/bin/g2o -i 70 -solver gn_pcg -o ../results/g2o_out_70.g2o ../results/graphFile.g2o", shell=True);
 
 indicesIn = open("../results/g2oIndices");
 datain = open("../results/g2o_out_70.g2o");
@@ -17,7 +18,7 @@ for line in datain:
 	gtline = [x.strip() for x in line.split(' ')];
 	if gtline[0] == "VERTEX_SE3:QUAT":
 		
-		if int(gtline[1]) < 5000:
+		if int(gtline[1]) < 10000:
 			groundTruthIndex = indicesIn.readline().rstrip();
 			#dataout.write("1305031" + str(float(gtline[1])/100)+ " ");
 			#dataout.write(str(float(gtline[1]))+ " ");			
@@ -35,7 +36,8 @@ if "SSRR" in dataset:
 	call("python2 ../scripts/evaluate_ate.py ../results/g2o_out_70_errorTest.g2o ../results/g2o_out_70_errorTest.g2o --verbose --scale 1 --plot ../results/g2o_ate.png > ../results/g2o_ate.res ", shell=True); 
 else:
 	call("python2 ../scripts/evaluate_rpe.py groundtruth.txt ../results/g2o_out_70_errorTest.g2o --interpolate --verbose --delta_unit 'f' --fixed_delta --plot ../results/g2o_rpe.png > ../results/g2o_rpe.res", shell=True);
-	call("python2 ../scripts/evaluate_ate.py groundtruth.txt ../results/g2o_out_70_errorTest.g2o --verbose --scale 1 --plot ../results/g2o_ate.png > ../results/g2o_ate.res ", shell=True); 
+	call("python2 ../scripts/evaluate_ate.py groundtruth.txt ../results/g2o_out_70_errorTest.g2o --verbose --scale 1 --save_associations g2o_ate_association.res --plot ../results/g2o_ate.png > ../results/g2o_ate.res ", shell=True); 
 
 call("mv export_trans.txt ../results/g2o_transErrors", shell=True);
 call("mv export_rot.txt ../results/g2o_rotErrors", shell=True);
+call("mv g2o_ate_association.res ../results/g2o_ate_association.res", shell=True);
