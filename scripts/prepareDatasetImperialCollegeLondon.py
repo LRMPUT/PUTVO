@@ -45,14 +45,14 @@ for i in range(1,int(numberOfImages)+1):
 	print(str(i)+"/"+ (numberOfImages.rstrip())+"\t" + rgbName.rstrip() + "\t" + dName.rstrip());
 	
 	# Copying images
-	call("cp ../../Datasets/"+dataset+"/"+str(rgbName.rstrip())+" ./rgb_%0.4d.png" % (i), shell=True);
+	call("cp ../../Datasets/"+dataset+"/"+str(rgbName.rstrip())+" ./rgb_%0.5d.png" % (i), shell=True);
 	call("cp ../../Datasets/"+dataset+"/"+str(dName.rstrip())+" ./depth_%0.4d.depth" % (i), shell=True);
 	
 	# Converting depth images
 	if "living" in dataset:
-		call("./kinect 0 depth_%0.4d.depth" % (i) + " depth_%0.4d.png" % (i), shell=True);
+		call("./kinect 0 depth_%0.4d.depth" % (i) + " depth_%0.5d.png" % (i), shell=True);
 	else:
-		call("./kinect 1 depth_%0.4d.depth" % (i) + " depth_%0.4d.png" % (i), shell=True);
+		call("./kinect 1 depth_%0.4d.depth" % (i) + " depth_%0.5d.png" % (i), shell=True);
 	call("rm *.depth", shell=True);
 
 	# Saving initial position from gt

@@ -64,5 +64,5 @@ for i in range(1,int(numberOfImages)+1):
 	p1 = subprocess.Popen("cat groundtruth.txt", stdout=subprocess.PIPE, shell=True);
 	p2 = subprocess.Popen("head -n " + str(i), stdin=p1.stdout, stdout=subprocess.PIPE, shell=True);
 	p3 = subprocess.Popen("tail -1", stdin=p2.stdout, stdout=subprocess.PIPE, shell=True);
-	p4 = subprocess.Popen("cut -d' ' -f 1 >> matched", stdin=p3.stdout, stdout=subprocess.PIPE, shell=True);
+	p4 = subprocess.Popen("cut -d' ' -f 1 >> matchedIndices", stdin=p3.stdout, stdout=subprocess.PIPE, shell=True);
 

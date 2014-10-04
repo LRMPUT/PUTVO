@@ -4,13 +4,13 @@ import sys
 import glob
 import os
 
-folderName = "AMCS";
+folderName = "HugeComparison";
 verbose = 0;
 
 freiburg1 = ['rgbd_dataset_freiburg1_desk', 'rgbd_dataset_freiburg1_desk2', 'rgbd_dataset_freiburg1_room'];
 freiburg2 = ['rgbd_dataset_freiburg2_pioneer_360', 'rgbd_dataset_freiburg2_pioneer_slam', 'rgbd_dataset_freiburg2_pioneer_slam2', 'rgbd_dataset_freiburg2_pioneer_slam3'];
 freiburg3 = ['rgbd_dataset_freiburg3_long_office_household'];
-imperialCollege = ['living_room_2', 'office_traj0'];
+imperialCollege = ['living_room_0', 'living_room_2', 'office_traj0'];
 ssrr = ['outdoorhand1', 'outdoorhand2', 'outdoorhand3', 'outdoorhand4', 'messor1', 'messor2', 'messor3'];
 outdoor2 = ['outdoorhand2'];
 ssrr2 = ['messor4', 'messor5'];
@@ -21,6 +21,7 @@ ssrrKinVsXtion2 = [ 'exp_in_4_asus', 'exp_in_4_kinect2', 'exp_out_6_kinect2' ];
 
 datasetNames = ['rgbd_dataset_freiburg3_long_office_household'];
 datasetNames.extend(freiburg1);
+#datasetNames.extend(imperialCollege);
 
 for index in range(len(datasetNames)):
 
