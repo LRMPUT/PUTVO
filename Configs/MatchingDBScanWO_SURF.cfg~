@@ -9,7 +9,7 @@
 # Matching Loop Closure window to i-y (define y, y<x)
 5
 # Matching type (0 - FAST/BRIEF | 1 - SURF/SURF | 2 - ORB)
-2
+1
 # Temporally saved history size
 10000
 # Bundle Adjustment
@@ -53,11 +53,6 @@
 2
 # DBScan eps
 4
-####
-####	Quadtree
-####
-# Quadtree on/off
-0
 ####
 #### Transformation estimation
 ####

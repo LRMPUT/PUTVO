@@ -13,7 +13,7 @@
 # Temporally saved history size
 10000
 # Bundle Adjustment
-1
+0
 # Bundle Adjustment window size
 5
 ### 
@@ -53,11 +53,6 @@
 2
 # DBScan eps
 4
-####
-####	Quadtree
-####
-# Quadtree on/off
-0
 ####
 #### Transformation estimation
 ####

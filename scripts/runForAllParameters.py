@@ -4,7 +4,7 @@ import sys
 import glob
 import os
 
-folderName = "AAAtest";
+folderName = "HugeComparison";
 verbose = 0;
 
 freiburg1 = ['rgbd_dataset_freiburg1_desk', 'rgbd_dataset_freiburg1_desk2', 'rgbd_dataset_freiburg1_room'];
@@ -19,8 +19,9 @@ ssrr3 = ['messor1', 'messor2', 'messor3', 'messor4', 'messor5'];
 ssrrKinVsXtion = [ 'exp1_out_asus', 'exp1_out_kinect2','exp2_out_asus', 'exp2_out_kinect2', 'exp3_out_asus', 'exp3_out_kinect2' ];
 ssrrKinVsXtion2 = [ 'exp_in_4_asus', 'exp_in_4_kinect2', 'exp_out_6_kinect2' ];
 
-datasetNames = ['living_room_2']; # ['rgbd_dataset_freiburg3_long_office_household'];
-#datasetNames.extend(freiburg1);
+datasetNames = ['rgbd_dataset_freiburg3_long_office_household'];
+datasetNames.extend(freiburg1);
+datasetNames.extend(imperialCollege);
 
 for index in range(len(datasetNames)):
 
@@ -43,6 +44,7 @@ for index in range(len(datasetNames)):
 		datasetType = "SSRR";
 	else :
 		call('python2 ../scripts/prepareDatasetImperialCollegeLondon.py ' + datasetName, shell=True);
+		datasetType = "Imperial";
 
 	for file in glob.glob("../Configs/*.cfg"):
 		base = os.path.basename(file);

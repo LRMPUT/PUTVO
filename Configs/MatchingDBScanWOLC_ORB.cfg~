@@ -3,7 +3,7 @@
 # Tracking (0), Matching (1)
 1
 # Matching Loop Closure
-0
+1
 # Matching Loop Closure window from i-x (define x)
 50
 # Matching Loop Closure window to i-y (define y, y<x)
@@ -53,11 +53,6 @@
 2
 # DBScan eps
 4
-####
-####	Quadtree
-####
-# Quadtree on/off
-0
 ####
 #### Transformation estimation
 ####

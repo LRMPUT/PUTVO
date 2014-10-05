@@ -1,7 +1,7 @@
 # Verbose 
 0
 # Tracking (0), Matching (1)
-1
+0
 # Matching Loop Closure
 0
 # Matching Loop Closure window from i-x (define x)
@@ -13,7 +13,7 @@
 # Temporally saved history size
 10000
 # Bundle Adjustment
-1
+0
 # Bundle Adjustment window size
 5
 ### 
@@ -48,16 +48,11 @@
 ####	DBScan
 ####
 # DBScan on/off
-1
+0
 # DBScan MinPts
 2
 # DBScan eps
 4
-####
-####	Quadtree
-####
-# Quadtree on/off
-0
 ####
 #### Transformation estimation
 ####

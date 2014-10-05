@@ -1,9 +1,9 @@
-# Verbose 
+# Verbose
 0
 # Tracking (0), Matching (1)
-1
-# Matching Loop Closure
 0
+# Matching Loop Closure
+1
 # Matching Loop Closure window from i-x (define x)
 50
 # Matching Loop Closure window to i-y (define y, y<x)
@@ -13,7 +13,7 @@
 # Temporally saved history size
 10000
 # Bundle Adjustment
-1
+0
 # Bundle Adjustment window size
 5
 ### 
@@ -24,22 +24,22 @@
 # Tracking feature number
 500
 # Maximal tracking step
-4
+3
 # Tracking features threshold
 70
 # Tracking winSize
-4
+5
 # Tracking max levels
 3
 ####
 #### Detection 
 ####
 # Detection in stripes
-0
+1
 # New detector on/off
 0
 # New detector kickThreshold
-1
+2
 # New detector fast threshold
 0
 # New detector depth test threshold
@@ -108,5 +108,11 @@
 0
 # Showing tracking
 0
+# Transformation Uncertainty
+0
 # g2o with features
+0
+# g2o with TRACKXYZ
+0
+# g2o vs sba save file
 0
