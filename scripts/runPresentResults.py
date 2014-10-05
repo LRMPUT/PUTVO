@@ -24,7 +24,8 @@ for root, dirs, files in os.walk("../"+folderName+"/"):
 	time = "";
 	
 
-	for file in files:
+	for file in sorted(files, reverse=True):
+		#print("File: " + file);
 		if 'g2o_rpe.res' in file:
 			call("echo \"" + root + "\" >> test" , shell=True); 
 			call("cat " + root +"/" + file + " | grep translational_error.rmse |  sed 's/translational_error.rmse/RPE.rmse/'>> test" , shell=True); 	
@@ -45,6 +46,7 @@ for root, dirs, files in os.walk("../"+folderName+"/"):
 			p4 = subprocess.Popen("sed 's/ m//'", stdin=p3.stdout, stdout=subprocess.PIPE, shell=True);	
 			p5 = subprocess.Popen("head -c -1", stdin=p4.stdout, stdout=subprocess.PIPE, shell=True);		
 			rpeTraMax, err = p5.communicate();
+			#print("RpeTraMax: " + rpeTraMax);
 			rpeTraMax = str(round( float(rpeTraMax.rstrip()), 3));
 
 			
