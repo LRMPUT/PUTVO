@@ -23,8 +23,8 @@ numberOfImages, err = p.communicate();
 
 
 # Running program
-call("./kinect " + numberOfImages.rstrip() +" " + str(scale), shell=True);
-#call("./kinect " + "150" + " " + str(scale), shell=True);
+#call("./kinect " + numberOfImages.rstrip() +" " + str(scale), shell=True);
+call("./kinect " + "150" + " " + str(scale), shell=True);
 
 
 # Running evaluation
